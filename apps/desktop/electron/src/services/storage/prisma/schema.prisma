@@ -1,0 +1,8 @@
+// Prisma schema (placeholder)
+// datasource db { provider = "sqlite" url = "file:./dev.db" }
+// generator client { provider = "prisma-client-js" }
+
+model File {
+  id   Int    @id @default(autoincrement())
+  path String @unique
+}

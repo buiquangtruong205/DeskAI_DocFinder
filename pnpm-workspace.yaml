@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+  - tools/*
+
+ignoredBuiltDependencies:
+  - better-sqlite3
+  - electron
+  - esbuild
+  - vue-demi

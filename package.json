@@ -1,0 +1,14 @@
+{
+  "name": "deskai-docfinder",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev:desktop": "npm run dev --prefix apps/desktop",
+    "dev:electron": "npm run dev:electron --prefix apps/desktop",
+    "build:electron": "npm run build:electron --prefix apps/desktop"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
