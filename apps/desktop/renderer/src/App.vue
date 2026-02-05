@@ -3,7 +3,16 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue';
+import { useSettingsStore } from './stores/settings.store';
 import MainLayout from './layouts/MainLayout.vue';
+
+const settingsStore = useSettingsStore();
+
+// Load settings on app start
+onMounted(() => {
+  settingsStore.loadSettings();
+});
 </script>
 
 <style>

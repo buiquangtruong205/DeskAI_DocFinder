@@ -8,11 +8,21 @@
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
     }
+    
+    /* Light mode background */
+    html:not(.dark) {
+        @apply bg-gray-50;
+    }
+    
+    /* Dark mode background */
+    html.dark {
+        @apply bg-gray-900;
+    }
 }
 
 @layer utilities {
 
-    /* Custom Scrollbar */
+    /* Custom Scrollbar - Light Mode */
     .scrollbar-thin::-webkit-scrollbar {
         width: 6px;
         height: 6px;
@@ -23,13 +33,13 @@
     }
 
     .scrollbar-thin::-webkit-scrollbar-thumb {
-        @apply bg-gray-300 rounded-full hover:bg-gray-400 transition-colors;
+        @apply bg-gray-300 dark:bg-gray-600 rounded-full hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors;
     }
 }
 
 /* Global Selection Style */
 ::selection {
-    @apply bg-indigo-500/20 text-indigo-700;
+    @apply bg-indigo-500/20 text-indigo-700 dark:text-indigo-300;
 }
 
 /* Base Styles */
