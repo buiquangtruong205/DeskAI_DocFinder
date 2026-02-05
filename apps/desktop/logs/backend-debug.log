@@ -1,0 +1,154 @@
+[2026-02-05T03:14:00.591Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:16:35.695Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T03:16:35.696Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T03:16:35.697Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:22:26.108Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T03:22:26.109Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T03:22:26.110Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:22:26.111Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:22:26.210Z] [FileScanner] No changes detected
+[2026-02-05T03:22:32.640Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu
+[2026-02-05T03:22:32.642Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:22:32.645Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Máy tính
+[2026-02-05T03:22:32.646Z] [FileScanner] No changes detected
+[2026-02-05T03:22:32.669Z] [FileScanner] Creating 2 jobs
+[2026-02-05T03:22:32.724Z] [FileScanner] Creating 7 jobs
+[2026-02-05T03:22:33.187Z] [JobQueue] Job 6f29d85c-af66-423f-914d-71b49617d938 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:34.184Z] [JobQueue] Job cfab5890-d571-4c54-b2ef-46455cab3471 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:35.195Z] [JobQueue] Job 3fecbe0e-5320-4b58-a840-2f6d2bb0e631 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:36.198Z] [JobQueue] Job 52c7405c-52ae-4389-adb1-235abd9d6d89 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:37.204Z] [JobQueue] Job eade262c-19b7-4e63-a4b7-b9a705328b79 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:38.209Z] [JobQueue] Job 81f0e6e9-a3fa-4b1a-afbf-d65d1fac3cd9 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:39.210Z] [JobQueue] Job df285400-2ebe-4350-acc4-ffa1e239fb6b completed
+[2026-02-05T03:22:39.567Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu
+[2026-02-05T03:22:39.570Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:22:39.574Z] [FileScanner] No changes detected
+[2026-02-05T03:22:39.576Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Máy tính
+[2026-02-05T03:22:39.596Z] [FileScanner] Creating 2 jobs
+[2026-02-05T03:22:39.641Z] [FileScanner] Creating 7 jobs
+[2026-02-05T03:22:40.224Z] [JobQueue] Job f4a63207-562b-4c6a-a4f2-de50819e6174 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:41.224Z] [JobQueue] Job 23e6bdb8-3dc8-4e82-9033-cd33906cbfdb failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:42.236Z] [JobQueue] Job 2da9b8b2-283a-40ef-9c38-3ab5a00cee01 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:43.247Z] [JobQueue] Job 25f2724e-49a9-4691-9491-244b70c89a0c failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:44.261Z] [JobQueue] Job 8f612557-1e27-4654-8fcd-11cafbe88bb2 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:45.277Z] [JobQueue] Job f11a29f9-e16b-412c-94cc-65ff6a9accd7 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:46.287Z] [JobQueue] Job 467217e9-858c-42c9-a28d-fa8cf445bc25 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:47.282Z] [JobQueue] Job 0104c8bb-b1ff-401a-be4c-318d8b788e3a failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:48.283Z] [JobQueue] Job bb15472f-78b1-4030-9113-b52c2ab35ca7 completed
+[2026-02-05T03:22:49.293Z] [JobQueue] Job b3b18dc3-eeba-46a0-87f5-5c97e15bd5c2 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:22:50.297Z] [JobQueue] Job ecc28250-3927-466d-b6d8-627d020cbec6 failed "FOREIGN KEY constraint failed"
+[2026-02-05T03:25:04.702Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T03:25:04.703Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T03:25:04.704Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:25:04.705Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:25:04.806Z] [FileScanner] No changes detected
+[2026-02-05T03:25:11.678Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu
+[2026-02-05T03:25:11.682Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:25:11.684Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Máy tính
+[2026-02-05T03:25:11.686Z] [FileScanner] No changes detected
+[2026-02-05T03:25:11.702Z] [FileScanner] Creating 2 jobs
+[2026-02-05T03:25:11.782Z] [JobQueue] Job 9fa51c6e-8245-4efa-8875-dc4cb9979b79 failed "fetch failed"
+[2026-02-05T03:25:11.788Z] [FileScanner] Creating 7 jobs
+[2026-02-05T03:25:12.755Z] [JobQueue] Job a6b13925-aa47-403d-9077-3193a2160072 failed "fetch failed"
+[2026-02-05T03:25:13.770Z] [JobQueue] Job 518ab647-5d4f-4057-b791-2b1f685461cf failed "fetch failed"
+[2026-02-05T03:25:14.772Z] [JobQueue] Job 4f553253-f4b2-4713-9414-846bb1340bfe failed "fetch failed"
+[2026-02-05T03:25:15.842Z] [JobQueue] Job 8b032583-607d-4b5b-bd88-55c5050823a4 failed "fetch failed"
+[2026-02-05T03:25:16.847Z] [JobQueue] Job 0ebfdaa5-136a-4f08-869f-0fa950e9e504 failed "fetch failed"
+[2026-02-05T03:25:17.848Z] [JobQueue] Job 919286bd-659c-4afb-b8fb-f680590c3da2 completed
+[2026-02-05T03:25:18.864Z] [JobQueue] Job 4d664e67-ccaf-4754-b620-4eb540d45cec failed "fetch failed"
+[2026-02-05T03:25:19.876Z] [JobQueue] Job f218a659-b5b0-4abf-8471-d8f970c60763 failed "fetch failed"
+[2026-02-05T03:25:33.632Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T03:25:33.633Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T03:25:33.633Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:25:33.634Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:25:33.726Z] [FileScanner] No changes detected
+[2026-02-05T03:27:31.303Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T03:27:31.304Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T03:27:31.304Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:27:31.306Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:27:31.383Z] [FileScanner] No changes detected
+[2026-02-05T03:36:01.625Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T03:36:01.650Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T03:36:01.650Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:36:01.653Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:36:01.746Z] [FileScanner] No changes detected
+[2026-02-05T03:38:52.661Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T03:38:52.662Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T03:38:52.663Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:38:52.664Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:38:52.759Z] [FileScanner] No changes detected
+[2026-02-05T03:40:31.426Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T03:40:31.428Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T03:40:31.429Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:40:31.432Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:40:31.550Z] [FileScanner] No changes detected
+[2026-02-05T03:43:10.948Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T03:43:10.950Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T03:43:10.951Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:43:10.953Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:43:11.039Z] [FileScanner] No changes detected
+[2026-02-05T03:45:14.070Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T03:45:14.071Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T03:45:14.071Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:45:14.074Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:45:14.182Z] [FileScanner] No changes detected
+[2026-02-05T03:50:28.813Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T03:50:28.815Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T03:50:28.815Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:50:28.817Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:50:28.911Z] [FileScanner] No changes detected
+[2026-02-05T03:57:29.909Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T03:57:29.911Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T03:57:29.912Z] [JobQueue] Starting job queue worker
+[2026-02-05T03:57:29.915Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T03:57:30.002Z] [FileScanner] No changes detected
+[2026-02-05T04:01:55.524Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T04:01:55.527Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T04:01:55.528Z] [JobQueue] Starting job queue worker
+[2026-02-05T04:01:55.531Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T04:01:55.623Z] [FileScanner] No changes detected
+[2026-02-05T04:20:01.187Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T04:20:01.189Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T04:20:01.189Z] [JobQueue] Starting job queue worker
+[2026-02-05T04:20:01.193Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T04:20:01.283Z] [FileScanner] No changes detected
+[2026-02-05T04:28:27.674Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T04:28:27.676Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T04:28:27.677Z] [JobQueue] Starting job queue worker
+[2026-02-05T04:28:27.680Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T04:28:27.748Z] [FileScanner] No changes detected
+[2026-02-05T04:29:22.289Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T04:29:22.291Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T04:29:22.291Z] [JobQueue] Starting job queue worker
+[2026-02-05T04:29:22.294Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T04:29:22.382Z] [FileScanner] No changes detected
+[2026-02-05T04:44:44.317Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T04:44:44.319Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T04:44:44.319Z] [JobQueue] Starting job queue worker
+[2026-02-05T04:44:44.322Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T04:44:44.416Z] [FileScanner] No changes detected
+[2026-02-05T04:58:22.428Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T04:58:22.430Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T04:58:22.430Z] [JobQueue] Starting job queue worker
+[2026-02-05T04:58:22.435Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T04:58:22.503Z] [FileScanner] No changes detected
+[2026-02-05T06:07:32.860Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T06:07:32.864Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T06:07:32.865Z] [JobQueue] Starting job queue worker
+[2026-02-05T06:07:32.867Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T06:07:33.116Z] [FileScanner] No changes detected
+[2026-02-05T06:22:01.251Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T06:22:01.253Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T06:22:01.254Z] [JobQueue] Starting job queue worker
+[2026-02-05T06:22:01.258Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T06:22:01.357Z] [FileScanner] No changes detected
+[2026-02-05T06:31:08.378Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T06:31:08.379Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T06:31:08.379Z] [JobQueue] Starting job queue worker
+[2026-02-05T06:31:08.382Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T06:31:08.453Z] [FileScanner] No changes detected
+[2026-02-05T06:32:11.190Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T06:32:11.192Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T06:32:11.192Z] [JobQueue] Starting job queue worker
+[2026-02-05T06:32:11.195Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T06:32:11.275Z] [FileScanner] No changes detected

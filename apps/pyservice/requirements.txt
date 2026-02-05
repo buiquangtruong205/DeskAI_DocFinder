@@ -5,3 +5,7 @@ qdrant-client
 sentence-transformers
 scikit-learn
 joblib
+google-generativeai
+python-dotenv
+httpx
+tenacity

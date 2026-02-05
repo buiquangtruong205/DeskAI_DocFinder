@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from qdrant_client.http import models as qm
 from typing import List
+import uuid
 
 from app.core.qdrant_client import get_client, ensure_collection, COLLECTION
 from app.services.embeddings import embedding_service
@@ -18,7 +19,19 @@ async def index_chunks(req: IndexRequest):
         ensure_collection(client)
 
         texts = [c.text for c in req.chunks]
-        ids = [c.chunkId for c in req.chunks]
+        ids = []
+        
+        # Ensure all IDs are valid UUIDs
+        for c in req.chunks:
+            try:
+                # Try to parse as UUID
+                uuid_obj = uuid.UUID(c.chunkId)
+                ids.append(str(uuid_obj))
+            except ValueError:
+                # If not valid UUID, generate a new one
+                new_id = str(uuid.uuid4())
+                ids.append(new_id)
+                print(f"Generated new UUID {new_id} for invalid ID: {c.chunkId}")
         
         # Batch Embed
         embeddings = embedding_service.embed_batch(texts)

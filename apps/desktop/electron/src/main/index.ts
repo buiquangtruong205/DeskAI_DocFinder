@@ -42,10 +42,18 @@ import { sourcesRepo } from '../services/storage/repositories/sources.repo';
 
 // ... imports
 
+console.log("\n\n==================================================================");
+console.log("   DESKAI ELECTRON MAIN PROCESS STARTED   ");
+console.log("==================================================================\n\n");
+
 app.whenReady().then(async () => {
   await initDb();
   // registerSearchHandlers(); // Removed, covered by registerIpcHandlers
   registerIpcHandlers();
+
+  // Start Job Queue Worker
+  const { jobQueue } = require('../services/indexing/jobQueue');
+  jobQueue.start();
 
   // Start scanning default docs folder for MVP
   // In real app, this should be user configurable via IPC

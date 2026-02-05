@@ -49,12 +49,13 @@ export const useAskStore = defineStore('ask', () => {
         messages.value.push(aiMsg);
 
         try {
-            // 3. Call API
-            const response = await askAI({
+            // 3. Call API - serialize to plain object to avoid IPC cloning issues with Vue reactive proxies
+            const request = JSON.parse(JSON.stringify({
                 question,
-                mode: mode.value as any, // Simple cast for now
+                mode: mode.value,
                 context: context.value
-            });
+            }));
+            const response = await askAI(request);
 
             // 4. Update AI Message
             const targetMsg = messages.value.find(m => m.id === aiMsgId);
@@ -68,10 +69,11 @@ export const useAskStore = defineStore('ask', () => {
 
         } catch (err: any) {
             console.error('Ask failed:', err);
-            error.value = err.message || 'Failed to get answer';
+            const errorMessage = err.message || 'Failed to get answer';
+            error.value = errorMessage;
             const targetMsg = messages.value.find(m => m.id === aiMsgId);
             if (targetMsg) {
-                targetMsg.content = 'Sorry, I encountered an error while processing your request.';
+                targetMsg.content = `❌ **Error**: ${errorMessage}\n\nPlease check:\n1. Python backend is running (python -m uvicorn app.main:app --reload --port 8000)\n2. Check Python terminal for detailed errors`;
                 targetMsg.loading = false;
             }
         } finally {

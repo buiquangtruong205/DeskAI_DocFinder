@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "vite renderer",
-    "dev:electron": "npm run build:electron && npx concurrently \"npm run dev\" \"npx wait-on tcp:5173 && npx electron .\"",
+    "dev:python": "cd ../pyservice && venv\\Scripts\\uvicorn app.main:app --reload --port 8000",
+    "dev:electron": "npm run build:electron && npx concurrently \"npm run dev\" \"npm run dev:python\" \"npx wait-on tcp:5173 && npx electron .\"",
     "build:electron": "esbuild electron/src/main/index.ts --bundle --platform=node --external:electron --external:electron-squirrel-startup --external:better-sqlite3 --external:uuid --external:chokidar --outfile=dist/electron/main/index.js && esbuild electron/src/preload/index.ts --bundle --platform=node --external:electron --outfile=dist/electron/preload/index.js",
     "build": "vue-tsc --noEmit && vite build renderer && npm run build:electron",
     "preview": "vite preview renderer"

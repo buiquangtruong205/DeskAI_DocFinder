@@ -2,6 +2,7 @@ import { extractText } from './textExtractor';
 import { chunkText } from './chunker';
 import { filesRepo } from '../storage/repositories/files.repo';
 import { chunksRepo } from '../storage/repositories/chunks.repo';
+import { sourcesRepo } from '../storage/repositories/sources.repo';
 import { pythonClient } from '../search/pythonClient';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -24,8 +25,8 @@ export class IndexOrchestrator {
       const text = await extractText(filePath);
       if (!text || text.trim().length === 0) {
         console.log(`[IndexOrchestrator] No text extracted from ${filePath}. Updating metadata only.`);
-        // Update file status to indexed even if empty?
         filesRepo.updateStatus(fileId, 'indexed');
+        sourcesRepo.incrementIndexedFiles(sourceId);
         return;
       }
 
@@ -70,9 +71,14 @@ export class IndexOrchestrator {
           type: type, // doc, code, pdf
           tags: [],
           mtime_ms: stats.mtimeMs,
+          // For display in citations
+          file_name: path.basename(filePath),
+          file_path: filePath,
+          // Legacy fields (keep for backwards compatibility)
           title: path.basename(filePath),
           path: filePath,
-          snippet: c.text.substring(0, 100) // Brief snippet for payload display
+          snippet: c.text.substring(0, 200), // Extended snippet for better context
+          text: c.text // Full text for RAG context
         }
       }));
 
@@ -81,11 +87,19 @@ export class IndexOrchestrator {
       // 6. Update File Status
       filesRepo.updateHash(fileId, hash);
       filesRepo.updateStatus(fileId, 'indexed', Date.now());
+
+      // Update Source Stats (IMPORTANT for UI Progress)
+      sourcesRepo.incrementIndexedFiles(sourceId);
+
       console.log(`[IndexOrchestrator] Successfully indexed ${filePath} (${chunks.length} chunks)`);
 
     } catch (err: any) {
       console.error(`[IndexOrchestrator] Error indexing ${filePath}:`, err);
       filesRepo.updateStatus(fileId, 'error', Date.now(), err.message);
+
+      // Update Source Stats (Failed)
+      sourcesRepo.incrementFailedFiles(sourceId);
+
       throw err; // Re-throw so JobQueue marks job as failed
     }
   }

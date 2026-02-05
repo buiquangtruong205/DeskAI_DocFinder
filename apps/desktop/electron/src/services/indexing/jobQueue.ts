@@ -1,15 +1,32 @@
 import { jobsRepo, JobRecord } from '../storage/repositories/jobs.repo';
 import { indexOrchestrator } from './indexOrchestrator';
 
+import { logToFile } from '../../utils/fileLogger';
+
 export class JobQueue {
   private isProcessing = false;
   private pollInterval: NodeJS.Timeout | null = null;
   private intervalMs = 1000; // Poll every second
 
-  start() {
+  async start() {
     if (this.pollInterval) return;
-    console.log('[JobQueue] Starting job queue worker...');
-    this.pollInterval = setInterval(() => this.processNext(), this.intervalMs);
+
+    // Reset stuck jobs
+    try {
+      logToFile('[JobQueue] Resetting stuck jobs...');
+      const count = jobsRepo.resetProcessingJobs();
+      console.log(`[JobQueue] Reset ${count} stuck jobs to pending`);
+      logToFile(`[JobQueue] Reset ${count} stuck jobs`);
+    } catch (err) {
+      console.error('[JobQueue] Failed to reset stuck jobs:', err);
+    }
+
+    console.log('[JobQueue] Starting job queue worker... (Interval 1000ms)');
+    logToFile('[JobQueue] Starting job queue worker');
+    this.pollInterval = setInterval(() => {
+      // console.log('[JobQueue] Heartbeat - checking for jobs...');
+      this.processNext();
+    }, this.intervalMs);
   }
 
   stop() {
@@ -51,10 +68,12 @@ export class JobQueue {
             console.warn(`[JobQueue] Unknown job type: ${job.type}`);
         }
 
+        logToFile(`[JobQueue] Job ${job.id} completed`);
         jobsRepo.updateStatus(job.id, 'completed');
         console.log(`[JobQueue] Job ${job.id} completed`);
 
       } catch (err: any) {
+        logToFile(`[JobQueue] Job ${job.id} failed`, err.message);
         console.error(`[JobQueue] Job ${job.id} failed:`, err);
         jobsRepo.updateStatus(job.id, 'failed', err.message || String(err));
       }

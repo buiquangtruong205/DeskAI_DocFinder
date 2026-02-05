@@ -237,10 +237,10 @@ var init_files_repo = __esm({
         stmt.run({ ...file, id });
         return id;
       },
-      getByPath: (path6) => {
+      getByPath: (path9) => {
         const db2 = getDb();
         const stmt = db2.prepare("SELECT * FROM files WHERE path = ?");
-        return stmt.get(path6);
+        return stmt.get(path9);
       },
       getById: (id) => {
         const db2 = getDb();
@@ -419,6 +419,189 @@ var init_jobs_repo = __esm({
       getErrorJobs: () => {
         const db2 = getDb();
         return db2.prepare("SELECT * FROM jobs WHERE status = 'failed'").all();
+      },
+      resetProcessingJobs: () => {
+        const db2 = getDb();
+        const result = db2.prepare("UPDATE jobs SET status = 'pending' WHERE status = 'processing'").run();
+        return result.changes;
+      }
+    };
+  }
+});
+
+// electron/src/utils/fileLogger.ts
+function logToFile(message, data) {
+  const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+  let line = `[${timestamp}] ${message}`;
+  if (data) {
+    try {
+      line += ` ${JSON.stringify(data)}`;
+    } catch (e) {
+      line += ` [Circular/Unserializable]`;
+    }
+  }
+  line += "\n";
+  try {
+    fs2.appendFileSync(LOG_FILE, line);
+  } catch (e) {
+    console.error("Failed to write to log file", e);
+  }
+}
+var fs2, path2, LOG_FILE;
+var init_fileLogger = __esm({
+  "electron/src/utils/fileLogger.ts"() {
+    "use strict";
+    fs2 = __toESM(require("fs"));
+    path2 = __toESM(require("path"));
+    LOG_FILE = path2.join(process.cwd(), "logs", "backend-debug.log");
+    try {
+      const dir = path2.dirname(LOG_FILE);
+      if (!fs2.existsSync(dir)) {
+        fs2.mkdirSync(dir, { recursive: true });
+      }
+    } catch (e) {
+      console.error("Failed to create log dir", e);
+    }
+  }
+});
+
+// electron/src/services/storage/repositories/sources.repo.ts
+var sources_repo_exports = {};
+__export(sources_repo_exports, {
+  sourcesRepo: () => sourcesRepo
+});
+var import_uuid3, sourcesRepo;
+var init_sources_repo = __esm({
+  "electron/src/services/storage/repositories/sources.repo.ts"() {
+    "use strict";
+    init_db();
+    import_uuid3 = require("uuid");
+    sourcesRepo = {
+      create: (input) => {
+        const db2 = getDb();
+        const id = (0, import_uuid3.v4)();
+        const now = Date.now();
+        const stmt = db2.prepare(`
+      INSERT INTO sources (id, name, path, type, status, totalFiles, indexedFiles, failedFiles, lastUpdate, includeTypes, excludePatterns, createdAt)
+      VALUES (@id, @name, @path, @type, @status, @totalFiles, @indexedFiles, @failedFiles, @lastUpdate, @includeTypes, @excludePatterns, @createdAt)
+    `);
+        const record = {
+          id,
+          name: input.name,
+          path: input.path,
+          type: input.type || "folder",
+          status: "pending",
+          totalFiles: 0,
+          indexedFiles: 0,
+          failedFiles: 0,
+          lastUpdate: now,
+          includeTypes: input.includeTypes ? JSON.stringify(input.includeTypes) : null,
+          excludePatterns: input.excludePatterns ? JSON.stringify(input.excludePatterns) : null,
+          createdAt: now
+        };
+        stmt.run(record);
+        return record;
+      },
+      getById: (id) => {
+        const db2 = getDb();
+        const stmt = db2.prepare("SELECT * FROM sources WHERE id = ?");
+        return stmt.get(id);
+      },
+      getByPath: (path9) => {
+        const db2 = getDb();
+        const stmt = db2.prepare("SELECT * FROM sources WHERE path = ?");
+        return stmt.get(path9);
+      },
+      getAll: () => {
+        const db2 = getDb();
+        const stmt = db2.prepare("SELECT * FROM sources ORDER BY createdAt DESC");
+        return stmt.all();
+      },
+      updateStatus: (id, status) => {
+        const db2 = getDb();
+        const stmt = db2.prepare("UPDATE sources SET status = ?, lastUpdate = ? WHERE id = ?");
+        stmt.run(status, Date.now(), id);
+      },
+      updateStats: (id, stats) => {
+        const db2 = getDb();
+        const updates = [];
+        const values = [];
+        if (stats.totalFiles !== void 0) {
+          updates.push("totalFiles = ?");
+          values.push(stats.totalFiles);
+        }
+        if (stats.indexedFiles !== void 0) {
+          updates.push("indexedFiles = ?");
+          values.push(stats.indexedFiles);
+        }
+        if (stats.failedFiles !== void 0) {
+          updates.push("failedFiles = ?");
+          values.push(stats.failedFiles);
+        }
+        updates.push("lastUpdate = ?");
+        values.push(Date.now());
+        values.push(id);
+        const stmt = db2.prepare(`UPDATE sources SET ${updates.join(", ")} WHERE id = ?`);
+        stmt.run(...values);
+      },
+      incrementIndexedFiles: (id) => {
+        const db2 = getDb();
+        const stmt = db2.prepare("UPDATE sources SET indexedFiles = indexedFiles + 1, lastUpdate = ? WHERE id = ?");
+        stmt.run(Date.now(), id);
+      },
+      incrementFailedFiles: (id) => {
+        const db2 = getDb();
+        const stmt = db2.prepare("UPDATE sources SET failedFiles = failedFiles + 1, lastUpdate = ? WHERE id = ?");
+        stmt.run(Date.now(), id);
+      },
+      delete: (id) => {
+        const db2 = getDb();
+        const stmt = db2.prepare("DELETE FROM sources WHERE id = ?");
+        stmt.run(id);
+      },
+      // Error management
+      addError: (sourceId, filePath, message) => {
+        const db2 = getDb();
+        const id = (0, import_uuid3.v4)();
+        const stmt = db2.prepare(`
+      INSERT INTO source_errors (id, sourceId, filePath, message, createdAt)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+        stmt.run(id, sourceId, filePath, message, Date.now());
+        return id;
+      },
+      getErrors: (sourceId) => {
+        const db2 = getDb();
+        const stmt = db2.prepare("SELECT * FROM source_errors WHERE sourceId = ? ORDER BY createdAt DESC");
+        return stmt.all(sourceId);
+      },
+      clearErrors: (sourceId) => {
+        const db2 = getDb();
+        const stmt = db2.prepare("DELETE FROM source_errors WHERE sourceId = ?");
+        stmt.run(sourceId);
+      },
+      deleteError: (errorId) => {
+        const db2 = getDb();
+        const stmt = db2.prepare("DELETE FROM source_errors WHERE id = ?");
+        stmt.run(errorId);
+      },
+      // Get file type stats for a source
+      getFileTypeStats: (sourceId) => {
+        const db2 = getDb();
+        const stmt = db2.prepare(`
+      SELECT extension, COUNT(*) as count 
+      FROM files 
+      WHERE sourceId = ? 
+      GROUP BY extension
+    `);
+        const rows = stmt.all(sourceId);
+        const stats = {};
+        rows.forEach((row) => {
+          if (row.extension) {
+            stats[row.extension] = row.count;
+          }
+        });
+        return stats;
       }
     };
   }
@@ -430,30 +613,23 @@ __export(scanner_exports, {
   FileScanner: () => FileScanner,
   fileScanner: () => fileScanner
 });
-var path2, fs2, import_events, import_uuid3, FileScanner, fileScanner;
+var path3, fs3, import_events, FileScanner, fileScanner;
 var init_scanner = __esm({
   "electron/src/services/indexing/scanner.ts"() {
     "use strict";
-    path2 = __toESM(require("path"));
-    fs2 = __toESM(require("fs"));
+    path3 = __toESM(require("path"));
+    fs3 = __toESM(require("fs"));
     import_events = require("events");
     init_files_repo();
     init_jobs_repo();
-    import_uuid3 = require("uuid");
+    init_fileLogger();
     FileScanner = class extends import_events.EventEmitter {
-      constructor() {
-        super();
-      }
-      /**
-       * Scans a source folder and schedules INDEX_FILE / DELETE_FILE jobs.
-       * @param sourceId The ID of the source in DB
-       * @param sourcePath Absolute path to the source folder
-       * @param options Include/Exclude patterns
-       */
+      // ...
       async scanSource(sourceId, sourcePath, options = {}) {
         console.log(`[FileScanner] Scanning source: ${sourcePath} (${sourceId})`);
+        logToFile(`[FileScanner] Scanning source: ${sourcePath}`);
         try {
-          if (!fs2.existsSync(sourcePath)) {
+          if (!fs3.existsSync(sourcePath)) {
             console.error(`[FileScanner] Source path not found: ${sourcePath}`);
             return;
           }
@@ -465,8 +641,9 @@ var init_scanner = __esm({
           dbFiles.forEach((f) => dbFileMap.set(f.path, f));
           const jobsToCreate = [];
           const newFilesToInsert = [];
+          let validFileCount = 0;
           for (const [filePath, stats] of diskFileMap) {
-            const ext = path2.extname(filePath).toLowerCase();
+            const ext = path3.extname(filePath).toLowerCase();
             if (options.include && options.include.length > 0) {
               if (!options.include.includes(ext))
                 continue;
@@ -475,18 +652,18 @@ var init_scanner = __esm({
               if (!defaultExts.includes(ext))
                 continue;
             }
+            validFileCount++;
             const dbFile = dbFileMap.get(filePath);
             if (!dbFile) {
-              const fileId = (0, import_uuid3.v4)();
               let type = "doc";
               if ([".js", ".ts", ".py", ".java", ".cpp", ".c", ".h", ".json", ".html", ".css", ".vue"].includes(ext)) {
                 type = "code";
               } else if ([".pdf"].includes(ext)) {
                 type = "pdf";
               }
-              filesRepo.create({
+              const fileId = filesRepo.create({
                 path: filePath,
-                name: path2.basename(filePath),
+                name: path3.basename(filePath),
                 extension: ext,
                 type,
                 sourceId,
@@ -510,6 +687,9 @@ var init_scanner = __esm({
               }
             }
           }
+          console.log(`[FileScanner] Found ${validFileCount} valid files for source ${sourceId}`);
+          const { sourcesRepo: sourcesRepo2 } = (init_sources_repo(), __toCommonJS(sources_repo_exports));
+          sourcesRepo2.updateStats(sourceId, { totalFiles: validFileCount });
           for (const [filePath, dbFile] of dbFileMap) {
             if (!diskFileMap.has(filePath)) {
               jobsToCreate.push({
@@ -520,12 +700,15 @@ var init_scanner = __esm({
           }
           if (jobsToCreate.length > 0) {
             console.log(`[FileScanner] Creating ${jobsToCreate.length} jobs for source ${sourceId}`);
+            logToFile(`[FileScanner] Creating ${jobsToCreate.length} jobs`);
             jobsRepo.createBatch(jobsToCreate);
           } else {
             console.log(`[FileScanner] No changes detected for source ${sourceId}`);
+            logToFile(`[FileScanner] No changes detected`);
           }
         } catch (err) {
           console.error(`[FileScanner] Error scanning source ${sourceId}:`, err);
+          logToFile(`[FileScanner] Error: ${err.message}`);
         }
       }
       async recursiveScan(dir, excludePatterns = []) {
@@ -533,9 +716,10 @@ var init_scanner = __esm({
         const systemExcludes = ["node_modules", ".git", "dist", "build", "coverage", "__pycache__"];
         const allExcludes = [...systemExcludes, ...excludePatterns];
         try {
-          const entries = await fs2.promises.readdir(dir, { withFileTypes: true });
+          const entries = await fs3.promises.readdir(dir, { withFileTypes: true });
+          console.log(`[Scanner] Reading dir: ${dir}, entries found: ${entries.length}`);
           for (const entry of entries) {
-            const resPath = path2.resolve(dir, entry.name);
+            const resPath = path3.resolve(dir, entry.name);
             if (allExcludes.some((pattern) => resPath.includes(pattern))) {
               continue;
             }
@@ -544,7 +728,7 @@ var init_scanner = __esm({
               results = results.concat(subResults);
             } else {
               try {
-                const stats = await fs2.promises.stat(resPath);
+                const stats = await fs3.promises.stat(resPath);
                 if (stats.size > 10 * 1024 * 1024)
                   continue;
                 results.push({
@@ -645,27 +829,33 @@ var init_chunks_repo = __esm({
 });
 
 // electron/src/services/search/pythonClient.ts
-var PYTHON_API_URL, pythonClient;
+var PYTHON_API_URL2, pythonClient;
 var init_pythonClient = __esm({
   "electron/src/services/search/pythonClient.ts"() {
     "use strict";
-    PYTHON_API_URL = "http://localhost:8000";
+    PYTHON_API_URL2 = "http://127.0.0.1:8000";
     pythonClient = {
       async indexChunks(chunks) {
         try {
-          const response = await fetch(`${PYTHON_API_URL}/index`, {
+          console.log(`[PythonClient] Sending ${chunks.length} chunks to ${PYTHON_API_URL2}/index`);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 1e4);
+          const response = await fetch(`${PYTHON_API_URL2}/index`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chunks })
+            body: JSON.stringify({ chunks }),
+            signal: controller.signal
           });
+          clearTimeout(timeoutId);
           if (!response.ok) {
             const text = await response.text();
             throw new Error(`Python indexing failed: ${text}`);
           }
           const res = await response.json();
-          console.log(`Python indexed ${res.indexed_count} chunks`);
+          console.log(`[PythonClient] Success: Indexed ${res.indexed_count} chunks`);
         } catch (err) {
-          console.error("Failed to send chunks to Python:", err);
+          console.error("[PythonClient] Failed to send chunks to Python:", err);
+          throw err;
         }
       },
       async search(query, filters, topK = 20) {
@@ -675,7 +865,7 @@ var init_pythonClient = __esm({
             top_k: topK,
             filters
           };
-          const response = await fetch(`${PYTHON_API_URL}/search`, {
+          const response = await fetch(`${PYTHON_API_URL2}/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
@@ -868,14 +1058,14 @@ var init_searchService = __esm({
 
 // electron/src/ipc/handlers/search.handlers.ts
 var search_handlers_exports = {};
-var import_electron2;
+var import_electron4;
 var init_search_handlers = __esm({
   "electron/src/ipc/handlers/search.handlers.ts"() {
     "use strict";
-    import_electron2 = require("electron");
+    import_electron4 = require("electron");
     init_searchService();
     init_files_repo();
-    import_electron2.ipcMain.handle("search:query", async (event, { query, options }) => {
+    import_electron4.ipcMain.handle("search:query", async (event, { query, options }) => {
       try {
         console.log("[search:query] Request:", query, options);
         const { results, stats } = await searchService.search(query, options);
@@ -885,23 +1075,23 @@ var init_search_handlers = __esm({
         return { success: false, error: err.message || "Search failed" };
       }
     });
-    import_electron2.ipcMain.handle("search:openFile", async (event, filePath) => {
+    import_electron4.ipcMain.handle("search:openFile", async (event, filePath) => {
       console.log("Opening file:", filePath);
       try {
-        await import_electron2.shell.openPath(filePath);
+        await import_electron4.shell.openPath(filePath);
         return { success: true, message: `Opened ${filePath}` };
       } catch (err) {
         console.error("Failed to open file:", err);
         return { success: false, error: err.message };
       }
     });
-    import_electron2.ipcMain.handle("search:addFavorite", async (event, item) => {
+    import_electron4.ipcMain.handle("search:addFavorite", async (event, item) => {
       console.log("Adding to favorites:", item);
-      const { v4: uuidv46 } = require("uuid");
+      const { v4: uuidv45 } = require("uuid");
       const { getDb: getDb2 } = (init_db(), __toCommonJS(db_exports));
       try {
         const db2 = getDb2();
-        const id = uuidv46();
+        const id = uuidv45();
         db2.prepare("INSERT INTO favorites (id, type, refJson, createdAt) VALUES (?, ?, ?, ?)").run(
           id,
           item.type || "SNIPPET",
@@ -915,11 +1105,11 @@ var init_search_handlers = __esm({
         return { success: false, error: err.message };
       }
     });
-    import_electron2.ipcMain.handle("search:sendToAsk", async (event, { query, context }) => {
+    import_electron4.ipcMain.handle("search:sendToAsk", async (event, { query, context }) => {
       console.log("Sending to Ask:", query, context);
       return { success: true };
     });
-    import_electron2.ipcMain.handle("search:getPreview", async (event, { fileId, chunkId }) => {
+    import_electron4.ipcMain.handle("search:getPreview", async (event, { fileId, chunkId }) => {
       try {
         const file = filesRepo.getById(fileId);
         if (!file)
@@ -953,68 +1143,6 @@ var init_search_handlers = __esm({
         return { success: false, error: err.message };
       }
     });
-  }
-});
-
-// electron/src/ipc/handlers/ask.handlers.ts
-var ask_handlers_exports = {};
-__export(ask_handlers_exports, {
-  registerAskHandlers: () => registerAskHandlers
-});
-var import_electron3, registerAskHandlers;
-var init_ask_handlers = __esm({
-  "electron/src/ipc/handlers/ask.handlers.ts"() {
-    "use strict";
-    import_electron3 = require("electron");
-    registerAskHandlers = () => {
-      import_electron3.ipcMain.handle("ask:query", async (event, { question, context, mode, options }) => {
-        console.log("Ask query received:", { question, mode });
-        await new Promise((resolve2) => setTimeout(resolve2, 1500));
-        const mockAnswers = {
-          "default": `Here is a summary based on your documents. 
-
-Redis is an open-source, in-memory data structure store, used as a database, cache, and message broker. 
-
-### Key Failures:
-- **Performance**: Extremely fast due to in-memory nature.
-- **Data Structures**: Supports strings, hashes, lists, sets, etc.
-- **Persistence**: Can save data to disk via RDB or AOF.
-
-It is often used for caching session data, full page cache, or message queues.`,
-          "summarize": `The documents mainly discuss **Redis** as a caching solution. It highlights the trade-offs between memory usage and speed.`
-        };
-        const answer = mockAnswers[mode] || mockAnswers["default"];
-        return {
-          id: Date.now().toString(),
-          answer,
-          citations: [
-            {
-              id: "doc-1",
-              name: "Redis_Caching.md",
-              path: "/docs/backend/Redis_Caching.md",
-              type: "markdown",
-              snippet: "Redis improves performance by caching frequently accessed data in memory.",
-              score: 0.95
-            },
-            {
-              id: "doc-2",
-              name: "Database_Comparison.pdf",
-              path: "/docs/architecture/Database_Comparison.pdf",
-              type: "pdf",
-              snippet: "Compared to Memcached, Redis pushes more features like persistence and complex types.",
-              score: 0.88
-            }
-          ],
-          followUps: [
-            "How do I configure Redis persistence?",
-            "Compare Redis vs Memcached",
-            "Show me a code example"
-          ],
-          confidence: 0.92,
-          usedTokens: 145
-        };
-      });
-    };
   }
 });
 
@@ -1233,15 +1361,15 @@ var init_favorites_repo = __esm({
 
 // electron/src/ipc/handlers/favorites.handlers.ts
 var favorites_handlers_exports = {};
-var import_electron4, fs3;
+var import_electron5, fs4;
 var init_favorites_handlers = __esm({
   "electron/src/ipc/handlers/favorites.handlers.ts"() {
     "use strict";
-    import_electron4 = require("electron");
-    fs3 = __toESM(require("fs"));
+    import_electron5 = require("electron");
+    fs4 = __toESM(require("fs"));
     init_favorites_repo();
     init_files_repo();
-    import_electron4.ipcMain.handle("favorites:list", async (_event, options) => {
+    import_electron5.ipcMain.handle("favorites:list", async (_event, options) => {
       try {
         const favorites = listFavorites(
           options?.filters || {},
@@ -1253,7 +1381,7 @@ var init_favorites_handlers = __esm({
         return { success: false, error: error.message };
       }
     });
-    import_electron4.ipcMain.handle("favorites:add", async (_event, payload) => {
+    import_electron5.ipcMain.handle("favorites:add", async (_event, payload) => {
       try {
         const favorite = addFavorite(payload);
         return { success: true, data: favorite };
@@ -1262,7 +1390,7 @@ var init_favorites_handlers = __esm({
         return { success: false, error: error.message };
       }
     });
-    import_electron4.ipcMain.handle("favorites:update", async (_event, { id, patch }) => {
+    import_electron5.ipcMain.handle("favorites:update", async (_event, { id, patch }) => {
       try {
         const favorite = updateFavorite(id, patch);
         if (!favorite) {
@@ -1274,7 +1402,7 @@ var init_favorites_handlers = __esm({
         return { success: false, error: error.message };
       }
     });
-    import_electron4.ipcMain.handle("favorites:remove", async (_event, id) => {
+    import_electron5.ipcMain.handle("favorites:remove", async (_event, id) => {
       try {
         const removed = removeFavorite(id);
         return { success: removed, error: removed ? null : "Favorite not found" };
@@ -1283,7 +1411,7 @@ var init_favorites_handlers = __esm({
         return { success: false, error: error.message };
       }
     });
-    import_electron4.ipcMain.handle("favorites:open", async (_event, id) => {
+    import_electron5.ipcMain.handle("favorites:open", async (_event, id) => {
       try {
         const favorite = getFavorite(id);
         if (!favorite) {
@@ -1298,10 +1426,10 @@ var init_favorites_handlers = __esm({
             const file = filesRepo.getById(ref.fileId);
             if (!file)
               throw new Error("File not found in index");
-            if (!fs3.existsSync(file.path)) {
+            if (!fs4.existsSync(file.path)) {
               throw new Error("File not found on disk (missing)");
             }
-            await import_electron4.shell.openPath(file.path);
+            await import_electron5.shell.openPath(file.path);
             return { success: true, data: { ...favorite, filePath: file.path } };
           }
           case "SNIPPET": {
@@ -1311,10 +1439,10 @@ var init_favorites_handlers = __esm({
             const file = filesRepo.getById(ref.fileId);
             if (!file)
               throw new Error("File not found in index");
-            if (!fs3.existsSync(file.path)) {
+            if (!fs4.existsSync(file.path)) {
               throw new Error("File not found on disk (missing)");
             }
-            await import_electron4.shell.openPath(file.path);
+            await import_electron5.shell.openPath(file.path);
             return { success: true, data: { ...favorite, filePath: file.path } };
           }
           case "ANSWER": {
@@ -1328,7 +1456,7 @@ var init_favorites_handlers = __esm({
         return { success: false, error: error.message };
       }
     });
-    import_electron4.ipcMain.handle("favorites:tags", async (_event) => {
+    import_electron5.ipcMain.handle("favorites:tags", async (_event) => {
       try {
         const tags = getAllTags();
         const counts = getTagCounts();
@@ -1338,7 +1466,7 @@ var init_favorites_handlers = __esm({
         return { success: false, error: error.message };
       }
     });
-    import_electron4.ipcMain.handle("favorites:folders:list", async (_event) => {
+    import_electron5.ipcMain.handle("favorites:folders:list", async (_event) => {
       try {
         const folders = listFolders();
         return { success: true, data: folders };
@@ -1347,7 +1475,7 @@ var init_favorites_handlers = __esm({
         return { success: false, error: error.message };
       }
     });
-    import_electron4.ipcMain.handle("favorites:folders:create", async (_event, { name, icon }) => {
+    import_electron5.ipcMain.handle("favorites:folders:create", async (_event, { name, icon }) => {
       try {
         const folder = createFolder(name, icon);
         return { success: true, data: folder };
@@ -1355,7 +1483,7 @@ var init_favorites_handlers = __esm({
         return { success: false, error: "Folders not implemented" };
       }
     });
-    import_electron4.ipcMain.handle("favorites:folders:delete", async (_event, id) => {
+    import_electron5.ipcMain.handle("favorites:folders:delete", async (_event, id) => {
       try {
         const deleted = deleteFolder(id);
         return { success: deleted, error: deleted ? null : "Folder not found" };
@@ -1512,260 +1640,40 @@ function generateMockInsights(range) {
   ];
   return range === "today" ? insights.slice(0, 3) : insights;
 }
-var import_electron5;
+var import_electron6;
 var init_insights_handlers = __esm({
   "electron/src/ipc/handlers/insights.handlers.ts"() {
     "use strict";
-    import_electron5 = require("electron");
-    import_electron5.ipcMain.handle("insights:getUsageStats", async (_event, range) => {
+    import_electron6 = require("electron");
+    import_electron6.ipcMain.handle("insights:getUsageStats", async (_event, range) => {
       await new Promise((resolve2) => setTimeout(resolve2, 200));
       return generateMockUsageData(range);
     });
-    import_electron5.ipcMain.handle("insights:getTopDocuments", async (_event, range) => {
+    import_electron6.ipcMain.handle("insights:getTopDocuments", async (_event, range) => {
       await new Promise((resolve2) => setTimeout(resolve2, 150));
       return generateMockTopDocuments();
     });
-    import_electron5.ipcMain.handle("insights:getTopicStats", async (_event, range) => {
+    import_electron6.ipcMain.handle("insights:getTopicStats", async (_event, range) => {
       await new Promise((resolve2) => setTimeout(resolve2, 150));
       return generateMockTopicStats();
     });
-    import_electron5.ipcMain.handle("insights:getSourceStats", async (_event, range) => {
+    import_electron6.ipcMain.handle("insights:getSourceStats", async (_event, range) => {
       await new Promise((resolve2) => setTimeout(resolve2, 150));
       return generateMockSourceStats();
     });
-    import_electron5.ipcMain.handle("insights:getNoResultQueries", async (_event, range) => {
+    import_electron6.ipcMain.handle("insights:getNoResultQueries", async (_event, range) => {
       await new Promise((resolve2) => setTimeout(resolve2, 150));
       return generateMockNoResultQueries();
     });
-    import_electron5.ipcMain.handle("insights:getKpiSummary", async (_event, range) => {
+    import_electron6.ipcMain.handle("insights:getKpiSummary", async (_event, range) => {
       await new Promise((resolve2) => setTimeout(resolve2, 100));
       return generateMockKpiSummary(range);
     });
-    import_electron5.ipcMain.handle("insights:getAutoInsights", async (_event, range) => {
+    import_electron6.ipcMain.handle("insights:getAutoInsights", async (_event, range) => {
       await new Promise((resolve2) => setTimeout(resolve2, 200));
       return generateMockInsights(range);
     });
     console.log("Insights IPC handlers registered");
-  }
-});
-
-// electron/src/ipc/handlers/playground.handlers.ts
-var playground_handlers_exports = {};
-__export(playground_handlers_exports, {
-  registerPlaygroundHandlers: () => registerPlaygroundHandlers
-});
-var import_electron6, registerPlaygroundHandlers;
-var init_playground_handlers = __esm({
-  "electron/src/ipc/handlers/playground.handlers.ts"() {
-    "use strict";
-    import_electron6 = require("electron");
-    registerPlaygroundHandlers = () => {
-      import_electron6.ipcMain.handle("playground:run", async (event, request) => {
-        console.log("Playground run request:", JSON.stringify(request, null, 2));
-        await new Promise((resolve2) => setTimeout(resolve2, 800));
-        const { prompt, retrieval, generation } = request;
-        const mockAnswers = {
-          "concise": `Redis is an in-memory data structure store used as a database, cache, and message broker. It supports strings, hashes, lists, sets, and more. Key features include high performance, replication, and persistence options.`,
-          "detailed": `Redis (Remote Dictionary Server) is an open-source, in-memory data structure store. It is widely used as a database, cache, and message broker.
-            
-Key Features:
-- **In-Memory Performance**: Extremely fast read/write operations.
-- **Data Structures**: Supports strings, hashes, lists, sets, sorted sets, bitmaps, hyperloglogs, and geospatial indexes.
-- **Persistence**: functionality to save data to disk via RDB snapshots or AOF logs.
-- **Replication**: Master-slave replication for high availability.
-
-It is often chosen for real-time applications, caching session data, and message queuing systems.`,
-          "bullet_points": `- **Type**: In-memory data structure store
-- **Uses**: Database, Cache, Message Broker
-- **Performance**: High throughput, low latency
-- **Features**: Persistence, Replication, Lua scripting, Transactions`
-        };
-        const style = generation.answerStyle || "detailed";
-        const answer = mockAnswers[style] || mockAnswers["detailed"];
-        const retrievedChunks = [
-          {
-            id: "chunk-1",
-            fileName: "Redis_Caching.md",
-            filePath: "/docs/backend/Redis_Caching.md",
-            content: "Redis is an open source (BSD licensed), in-memory data structure store, used as a database, cache, and message broker.",
-            score: 0.92,
-            highlightRanges: [{ start: 0, end: 5 }]
-          },
-          {
-            id: "chunk-2",
-            fileName: "Architecture_Overview.pdf",
-            filePath: "/docs/architecture/Architecture_Overview.pdf",
-            content: "For our caching layer, we selected Redis due to its support for complex data types and persistence capabilities compared to Memcached.",
-            score: 0.85
-          },
-          {
-            id: "chunk-3",
-            fileName: "Deployment_Guide.md",
-            filePath: "/docs/ops/Deployment_Guide.md",
-            content: "Ensure Redis is configured with maxmemory policy set to allkeys-lru for effective caching behavior.",
-            score: 0.78
-          }
-        ];
-        const limitedChunks = retrievedChunks.slice(0, retrieval.topK || 3);
-        return {
-          answer,
-          retrievedChunks: limitedChunks,
-          debug: {
-            retrievalTimeMs: 120,
-            // Mock time
-            generationTimeMs: 450,
-            // Mock time
-            tokenUsage: {
-              prompt: 156,
-              completion: 85,
-              total: 241
-            },
-            modelName: generation.model || "gpt-4o",
-            finalPrompt: `System: ${prompt.system}
-
-User: ${prompt.user}`
-          }
-        };
-      });
-    };
-  }
-});
-
-// electron/src/services/storage/repositories/sources.repo.ts
-var import_uuid5, sourcesRepo;
-var init_sources_repo = __esm({
-  "electron/src/services/storage/repositories/sources.repo.ts"() {
-    "use strict";
-    init_db();
-    import_uuid5 = require("uuid");
-    sourcesRepo = {
-      create: (input) => {
-        const db2 = getDb();
-        const id = (0, import_uuid5.v4)();
-        const now = Date.now();
-        const stmt = db2.prepare(`
-      INSERT INTO sources (id, name, path, type, status, totalFiles, indexedFiles, failedFiles, lastUpdate, includeTypes, excludePatterns, createdAt)
-      VALUES (@id, @name, @path, @type, @status, @totalFiles, @indexedFiles, @failedFiles, @lastUpdate, @includeTypes, @excludePatterns, @createdAt)
-    `);
-        const record = {
-          id,
-          name: input.name,
-          path: input.path,
-          type: input.type || "folder",
-          status: "pending",
-          totalFiles: 0,
-          indexedFiles: 0,
-          failedFiles: 0,
-          lastUpdate: now,
-          includeTypes: input.includeTypes ? JSON.stringify(input.includeTypes) : null,
-          excludePatterns: input.excludePatterns ? JSON.stringify(input.excludePatterns) : null,
-          createdAt: now
-        };
-        stmt.run(record);
-        return record;
-      },
-      getById: (id) => {
-        const db2 = getDb();
-        const stmt = db2.prepare("SELECT * FROM sources WHERE id = ?");
-        return stmt.get(id);
-      },
-      getByPath: (path6) => {
-        const db2 = getDb();
-        const stmt = db2.prepare("SELECT * FROM sources WHERE path = ?");
-        return stmt.get(path6);
-      },
-      getAll: () => {
-        const db2 = getDb();
-        const stmt = db2.prepare("SELECT * FROM sources ORDER BY createdAt DESC");
-        return stmt.all();
-      },
-      updateStatus: (id, status) => {
-        const db2 = getDb();
-        const stmt = db2.prepare("UPDATE sources SET status = ?, lastUpdate = ? WHERE id = ?");
-        stmt.run(status, Date.now(), id);
-      },
-      updateStats: (id, stats) => {
-        const db2 = getDb();
-        const updates = [];
-        const values = [];
-        if (stats.totalFiles !== void 0) {
-          updates.push("totalFiles = ?");
-          values.push(stats.totalFiles);
-        }
-        if (stats.indexedFiles !== void 0) {
-          updates.push("indexedFiles = ?");
-          values.push(stats.indexedFiles);
-        }
-        if (stats.failedFiles !== void 0) {
-          updates.push("failedFiles = ?");
-          values.push(stats.failedFiles);
-        }
-        updates.push("lastUpdate = ?");
-        values.push(Date.now());
-        values.push(id);
-        const stmt = db2.prepare(`UPDATE sources SET ${updates.join(", ")} WHERE id = ?`);
-        stmt.run(...values);
-      },
-      incrementIndexedFiles: (id) => {
-        const db2 = getDb();
-        const stmt = db2.prepare("UPDATE sources SET indexedFiles = indexedFiles + 1, lastUpdate = ? WHERE id = ?");
-        stmt.run(Date.now(), id);
-      },
-      incrementFailedFiles: (id) => {
-        const db2 = getDb();
-        const stmt = db2.prepare("UPDATE sources SET failedFiles = failedFiles + 1, lastUpdate = ? WHERE id = ?");
-        stmt.run(Date.now(), id);
-      },
-      delete: (id) => {
-        const db2 = getDb();
-        const stmt = db2.prepare("DELETE FROM sources WHERE id = ?");
-        stmt.run(id);
-      },
-      // Error management
-      addError: (sourceId, filePath, message) => {
-        const db2 = getDb();
-        const id = (0, import_uuid5.v4)();
-        const stmt = db2.prepare(`
-      INSERT INTO source_errors (id, sourceId, filePath, message, createdAt)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-        stmt.run(id, sourceId, filePath, message, Date.now());
-        return id;
-      },
-      getErrors: (sourceId) => {
-        const db2 = getDb();
-        const stmt = db2.prepare("SELECT * FROM source_errors WHERE sourceId = ? ORDER BY createdAt DESC");
-        return stmt.all(sourceId);
-      },
-      clearErrors: (sourceId) => {
-        const db2 = getDb();
-        const stmt = db2.prepare("DELETE FROM source_errors WHERE sourceId = ?");
-        stmt.run(sourceId);
-      },
-      deleteError: (errorId) => {
-        const db2 = getDb();
-        const stmt = db2.prepare("DELETE FROM source_errors WHERE id = ?");
-        stmt.run(errorId);
-      },
-      // Get file type stats for a source
-      getFileTypeStats: (sourceId) => {
-        const db2 = getDb();
-        const stmt = db2.prepare(`
-      SELECT extension, COUNT(*) as count 
-      FROM files 
-      WHERE sourceId = ? 
-      GROUP BY extension
-    `);
-        const rows = stmt.all(sourceId);
-        const stats = {};
-        rows.forEach((row) => {
-          if (row.extension) {
-            stats[row.extension] = row.count;
-          }
-        });
-        return stats;
-      }
-    };
   }
 });
 
@@ -1820,13 +1728,13 @@ function transformFile(record) {
     errorMessage: record.errorMessage || void 0
   };
 }
-var import_electron7, path3, fs4;
+var import_electron7, path4, fs5;
 var init_documents_handlers = __esm({
   "electron/src/ipc/handlers/documents.handlers.ts"() {
     "use strict";
     import_electron7 = require("electron");
-    path3 = __toESM(require("path"));
-    fs4 = __toESM(require("fs"));
+    path4 = __toESM(require("path"));
+    fs5 = __toESM(require("fs"));
     init_files_repo();
     init_sources_repo();
     import_electron7.ipcMain.handle("documents:list", async (_, filters, sort) => {
@@ -1914,8 +1822,8 @@ var init_documents_handlers = __esm({
           return null;
         const doc = transformFile(file);
         try {
-          if (fs4.existsSync(file.path)) {
-            const content = fs4.readFileSync(file.path, "utf-8");
+          if (fs5.existsSync(file.path)) {
+            const content = fs5.readFileSync(file.path, "utf-8");
             return { ...doc, content };
           }
         } catch (err) {
@@ -1959,12 +1867,12 @@ var init_documents_handlers = __esm({
     });
     import_electron7.ipcMain.handle("documents:reveal", async (_, filePath) => {
       try {
-        let targetPath = path3.normalize(filePath);
+        let targetPath = path4.normalize(filePath);
         console.log("Revealing file in explorer:", targetPath);
-        if (!fs4.existsSync(targetPath)) {
+        if (!fs5.existsSync(targetPath)) {
           console.warn("File does not exist:", targetPath);
-          const dirPath = path3.dirname(targetPath);
-          if (fs4.existsSync(dirPath)) {
+          const dirPath = path4.dirname(targetPath);
+          if (fs5.existsSync(dirPath)) {
             await import_electron7.shell.openPath(dirPath);
             return true;
           }
@@ -2053,14 +1961,14 @@ function transformSource(record) {
     errors: errors.map((e) => ({ file: e.filePath, message: e.message }))
   };
 }
-var import_electron8, path4;
+var import_electron8, path5;
 var init_sources_handlers = __esm({
   "electron/src/ipc/handlers/sources.handlers.ts"() {
     "use strict";
     import_electron8 = require("electron");
     init_sources_repo();
     init_files_repo();
-    path4 = __toESM(require("path"));
+    path5 = __toESM(require("path"));
     import_electron8.ipcMain.handle("sources:list", async () => {
       try {
         console.log("[sources:list] Getting all sources from DB...");
@@ -2077,7 +1985,7 @@ var init_sources_handlers = __esm({
     import_electron8.ipcMain.handle("sources:add", async (_, data) => {
       try {
         console.log("[sources:add] Received data:", data);
-        const folderName = data.options.name?.trim() || path4.basename(data.path);
+        const folderName = data.options.name?.trim() || path5.basename(data.path);
         const existing = sourcesRepo.getByPath(data.path);
         if (existing) {
           throw new Error("Source already exists");
@@ -2201,22 +2109,495 @@ var init_sources_handlers = __esm({
   }
 });
 
+// electron/src/services/indexing/textExtractor.ts
+async function extractText(filePath) {
+  const ext = path6.extname(filePath).toLowerCase();
+  try {
+    if (ext === ".txt" || ext === ".md" || ext === ".json" || ext === ".ts" || ext === ".js" || ext === ".py") {
+      return fs6.promises.readFile(filePath, "utf-8");
+    }
+    return "";
+  } catch (error) {
+    console.error(`Error extracting text from ${filePath}:`, error);
+    return "";
+  }
+}
+var fs6, path6;
+var init_textExtractor = __esm({
+  "electron/src/services/indexing/textExtractor.ts"() {
+    "use strict";
+    fs6 = __toESM(require("fs"));
+    path6 = __toESM(require("path"));
+  }
+});
+
+// electron/src/services/indexing/chunker.ts
+function chunkText(text, chunkSize = 1e3, overlap = 100) {
+  const chunks = [];
+  let start = 0;
+  if (!text || text.length === 0) {
+    return [];
+  }
+  while (start < text.length) {
+    const end = Math.min(start + chunkSize, text.length);
+    chunks.push({
+      text: text.slice(start, end),
+      start,
+      end
+    });
+    if (end === text.length)
+      break;
+    start += chunkSize - overlap;
+  }
+  return chunks;
+}
+var init_chunker = __esm({
+  "electron/src/services/indexing/chunker.ts"() {
+    "use strict";
+  }
+});
+
+// electron/src/services/indexing/indexOrchestrator.ts
+var path7, fs7, crypto, IndexOrchestrator, indexOrchestrator;
+var init_indexOrchestrator = __esm({
+  "electron/src/services/indexing/indexOrchestrator.ts"() {
+    "use strict";
+    init_textExtractor();
+    init_chunker();
+    init_files_repo();
+    init_chunks_repo();
+    init_sources_repo();
+    init_pythonClient();
+    path7 = __toESM(require("path"));
+    fs7 = __toESM(require("fs"));
+    crypto = __toESM(require("crypto"));
+    IndexOrchestrator = class {
+      async indexFile(fileId, filePath, sourceId) {
+        console.log(`[IndexOrchestrator] Indexing file: ${filePath}`);
+        try {
+          if (!fs7.existsSync(filePath)) {
+            throw new Error(`File not found: ${filePath}`);
+          }
+          const stats = await fs7.promises.stat(filePath);
+          const text = await extractText(filePath);
+          if (!text || text.trim().length === 0) {
+            console.log(`[IndexOrchestrator] No text extracted from ${filePath}. Updating metadata only.`);
+            filesRepo.updateStatus(fileId, "indexed");
+            sourcesRepo.incrementIndexedFiles(sourceId);
+            return;
+          }
+          const hash = crypto.createHash("sha256").update(text).digest("hex");
+          const chunks = chunkText(text);
+          chunksRepo.deleteByFileId(fileId);
+          const chunksData = chunks.map((c, idx) => ({
+            fileId,
+            chunkIndex: idx,
+            startOffset: c.start,
+            endOffset: c.end,
+            text: c.text,
+            created_at_ms: Date.now()
+          }));
+          chunksRepo.insertBatch(chunksData);
+          const ext = path7.extname(filePath).toLowerCase();
+          let type = "doc";
+          if ([".js", ".ts", ".py", ".java", ".cpp", ".c", ".h", ".json", ".html", ".css", ".vue"].includes(ext)) {
+            type = "code";
+          } else if ([".pdf"].includes(ext)) {
+            type = "pdf";
+          }
+          const payloadChunks = chunksData.map((c) => ({
+            chunkId: `${c.fileId}_${c.chunkIndex}`,
+            text: c.text,
+            fileId: c.fileId,
+            metadata: {
+              file_id: c.fileId,
+              source_id: sourceId,
+              type,
+              // doc, code, pdf
+              tags: [],
+              mtime_ms: stats.mtimeMs,
+              // For display in citations
+              file_name: path7.basename(filePath),
+              file_path: filePath,
+              // Legacy fields (keep for backwards compatibility)
+              title: path7.basename(filePath),
+              path: filePath,
+              snippet: c.text.substring(0, 200),
+              // Extended snippet for better context
+              text: c.text
+              // Full text for RAG context
+            }
+          }));
+          await pythonClient.indexChunks(payloadChunks);
+          filesRepo.updateHash(fileId, hash);
+          filesRepo.updateStatus(fileId, "indexed", Date.now());
+          sourcesRepo.incrementIndexedFiles(sourceId);
+          console.log(`[IndexOrchestrator] Successfully indexed ${filePath} (${chunks.length} chunks)`);
+        } catch (err) {
+          console.error(`[IndexOrchestrator] Error indexing ${filePath}:`, err);
+          filesRepo.updateStatus(fileId, "error", Date.now(), err.message);
+          sourcesRepo.incrementFailedFiles(sourceId);
+          throw err;
+        }
+      }
+      async deleteFile(fileId) {
+        console.log(`[IndexOrchestrator] Deleting file: ${fileId}`);
+        try {
+          filesRepo.delete(fileId);
+          console.log(`[IndexOrchestrator] Deleted file record ${fileId}`);
+        } catch (err) {
+          console.error(`[IndexOrchestrator] Error deleting file ${fileId}:`, err);
+          throw err;
+        }
+      }
+    };
+    indexOrchestrator = new IndexOrchestrator();
+  }
+});
+
+// electron/src/services/indexing/jobQueue.ts
+var jobQueue_exports = {};
+__export(jobQueue_exports, {
+  JobQueue: () => JobQueue,
+  jobQueue: () => jobQueue
+});
+var JobQueue, jobQueue;
+var init_jobQueue = __esm({
+  "electron/src/services/indexing/jobQueue.ts"() {
+    "use strict";
+    init_jobs_repo();
+    init_indexOrchestrator();
+    init_fileLogger();
+    JobQueue = class {
+      constructor() {
+        this.isProcessing = false;
+        this.pollInterval = null;
+        this.intervalMs = 1e3;
+      }
+      // Poll every second
+      async start() {
+        if (this.pollInterval)
+          return;
+        try {
+          logToFile("[JobQueue] Resetting stuck jobs...");
+          const count = jobsRepo.resetProcessingJobs();
+          console.log(`[JobQueue] Reset ${count} stuck jobs to pending`);
+          logToFile(`[JobQueue] Reset ${count} stuck jobs`);
+        } catch (err) {
+          console.error("[JobQueue] Failed to reset stuck jobs:", err);
+        }
+        console.log("[JobQueue] Starting job queue worker... (Interval 1000ms)");
+        logToFile("[JobQueue] Starting job queue worker");
+        this.pollInterval = setInterval(() => {
+          this.processNext();
+        }, this.intervalMs);
+      }
+      stop() {
+        if (this.pollInterval) {
+          clearInterval(this.pollInterval);
+          this.pollInterval = null;
+        }
+      }
+      async processNext() {
+        if (this.isProcessing)
+          return;
+        try {
+          const job = jobsRepo.getNextJob();
+          if (!job)
+            return;
+          this.isProcessing = true;
+          console.log(`[JobQueue] Processing job ${job.id} (${job.type})`);
+          jobsRepo.updateStatus(job.id, "processing");
+          try {
+            const payload = JSON.parse(job.payloadJson);
+            switch (job.type) {
+              case "INDEX_FILE":
+                await indexOrchestrator.indexFile(payload.fileId, payload.filePath, payload.sourceId);
+                break;
+              case "DELETE_FILE":
+                await indexOrchestrator.deleteFile(payload.fileId);
+                break;
+              case "SCAN":
+                break;
+              default:
+                console.warn(`[JobQueue] Unknown job type: ${job.type}`);
+            }
+            logToFile(`[JobQueue] Job ${job.id} completed`);
+            jobsRepo.updateStatus(job.id, "completed");
+            console.log(`[JobQueue] Job ${job.id} completed`);
+          } catch (err) {
+            logToFile(`[JobQueue] Job ${job.id} failed`, err.message);
+            console.error(`[JobQueue] Job ${job.id} failed:`, err);
+            jobsRepo.updateStatus(job.id, "failed", err.message || String(err));
+          }
+        } catch (err) {
+          console.error("[JobQueue] Error in worker loop:", err);
+        } finally {
+          this.isProcessing = false;
+        }
+      }
+    };
+    jobQueue = new JobQueue();
+  }
+});
+
 // electron/src/main/index.ts
 var import_electron9 = require("electron");
-var path5 = __toESM(require("path"));
-var fs5 = __toESM(require("fs"));
+var path8 = __toESM(require("path"));
+var fs8 = __toESM(require("fs"));
 init_db();
 init_scanner();
+
+// electron/src/ipc/handlers/ask.handlers.ts
+var import_electron2 = require("electron");
+init_chunks_repo();
+var PYTHON_API_URL = "http://127.0.0.1:8000";
+async function fallbackLocalSearch(question, topK = 3, errorReason) {
+  console.log("[Ask] Using fallback local search");
+  try {
+    const results = chunksRepo.searchKeyword(question, {}, topK);
+    const citations = results.map((r) => ({
+      id: r.chunkId || r.id,
+      name: r.name || "Unknown",
+      path: r.path || "",
+      type: r.type || "doc",
+      snippet: r.snippet || r.text?.substring(0, 200) + "...",
+      score: r.score || 0
+    }));
+    let answer = "\u26A0\uFE0F **Python API kh\xF4ng kh\u1EA3 d\u1EE5ng**";
+    if (errorReason) {
+      answer += `
+**L\u1ED7i**: ${errorReason}
+`;
+    }
+    answer += " - Hi\u1EC3n th\u1ECB k\u1EBFt qu\u1EA3 t\xECm ki\u1EBFm c\u1EE5c b\u1ED9:\n\n";
+    if (citations.length === 0) {
+      answer += "Kh\xF4ng t\xECm th\u1EA5y t\xE0i li\u1EC7u li\xEAn quan \u0111\u1EBFn c\xE2u h\u1ECFi c\u1EE7a b\u1EA1n.";
+    } else {
+      answer += `T\xECm th\u1EA5y **${citations.length}** t\xE0i li\u1EC7u li\xEAn quan:
+
+`;
+      citations.forEach((c, i) => {
+        answer += `${i + 1}. **${c.name}**
+   - Path: \`${c.path}\`
+   - ${c.snippet}
+
+`;
+      });
+      answer += "\n*\u0110\u1EC3 c\xF3 c\xE2u tr\u1EA3 l\u1EDDi AI chi ti\u1EBFt, vui l\xF2ng kh\u1EDFi \u0111\u1ED9ng Python backend.*";
+    }
+    return {
+      id: Date.now().toString(),
+      answer,
+      citations,
+      followUps: [
+        "H\u01B0\u1EDBng d\u1EABn kh\u1EDFi \u0111\u1ED9ng Python backend?",
+        "T\xECm ki\u1EBFm v\u1EDBi t\u1EEB kh\xF3a kh\xE1c"
+      ],
+      confidence: citations.length > 0 ? 0.5 : 0.1,
+      usedTokens: 0
+    };
+  } catch (err) {
+    console.error("[Ask] Fallback search error:", err);
+    return {
+      id: Date.now().toString(),
+      answer: "\u274C Kh\xF4ng th\u1EC3 th\u1EF1c hi\u1EC7n t\xECm ki\u1EBFm. Vui l\xF2ng th\u1EED l\u1EA1i sau.",
+      citations: [],
+      followUps: [],
+      confidence: 0,
+      usedTokens: 0
+    };
+  }
+}
+async function callPythonAskAPI(request) {
+  const response = await fetch(`${PYTHON_API_URL}/ask/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      question: request.question,
+      mode: request.mode || "answer",
+      context: request.context,
+      top_k: request.top_k || 3
+    })
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Python API error: ${response.status} - ${errorText}`);
+  }
+  return await response.json();
+}
+var registerAskHandlers = () => {
+  const GREETINGS = [
+    "hello",
+    "hi",
+    "hey",
+    "xin ch\xE0o",
+    "ch\xE0o",
+    "ch\xE0o b\u1EA1n",
+    "xin chao",
+    "chao",
+    "chao ban",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "ch\xE0o bu\u1ED5i s\xE1ng",
+    "ch\xE0o bu\u1ED5i chi\u1EC1u",
+    "ch\xE0o bu\u1ED5i t\u1ED1i",
+    "alo",
+    "helo",
+    "hallo"
+  ];
+  const isGreeting = (text) => {
+    const normalized = text.toLowerCase().trim();
+    return GREETINGS.some((g) => normalized === g || normalized.startsWith(g + " ") || normalized.endsWith(" " + g));
+  };
+  import_electron2.ipcMain.handle("ask:query", async (event, args) => {
+    console.log("[Ask] Raw args received:", JSON.stringify(args));
+    const { question, context, mode, options } = args || {};
+    console.log("[Ask] Query received:", { question, mode });
+    if (isGreeting(question)) {
+      return {
+        id: Date.now().toString(),
+        answer: '\u{1F44B} Xin ch\xE0o! T\xF4i c\xF3 th\u1EC3 gi\xFAp g\xEC cho b\u1EA1n?\n\nB\u1EA1n c\xF3 th\u1EC3 h\u1ECFi t\xF4i v\u1EC1 n\u1ED9i dung trong c\xE1c t\xE0i li\u1EC7u c\u1EE7a b\u1EA1n, v\xED d\u1EE5:\n- "T\xF3m t\u1EAFt n\u1ED9i dung file b\xE1o c\xE1o"\n- "T\xECm th\xF4ng tin v\u1EC1 d\u1EF1 \xE1n X"\n- "Gi\u1EA3i th\xEDch kh\xE1i ni\u1EC7m Y trong t\xE0i li\u1EC7u"',
+        citations: [],
+        followUps: [
+          "T\xF4i c\xF3 nh\u1EEFng t\xE0i li\u1EC7u n\xE0o?",
+          "H\u01B0\u1EDBng d\u1EABn s\u1EED d\u1EE5ng",
+          "T\xECm ki\u1EBFm t\xE0i li\u1EC7u"
+        ],
+        confidence: 1,
+        usedTokens: 0
+      };
+    }
+    try {
+      const result = await callPythonAskAPI({
+        question,
+        mode: mode || "answer",
+        context: context ? {
+          sources: context.sources,
+          source_ids: context.sourceIds
+        } : void 0,
+        top_k: options?.topK || 3
+      });
+      console.log("[Ask] Python API response received, citations:", result.citations?.length);
+      return JSON.parse(JSON.stringify(result));
+    } catch (err) {
+      console.error("[Ask] Python API error:", err.message);
+      console.error("[Ask] Full error:", err);
+      try {
+        const fallbackResult = await fallbackLocalSearch(
+          question,
+          options?.topK || 3,
+          err.message || "Unknown error"
+        );
+        return JSON.parse(JSON.stringify(fallbackResult));
+      } catch (fallbackErr) {
+        console.error("[Ask] Fallback also failed:", fallbackErr);
+        return {
+          id: Date.now().toString(),
+          answer: `\u274C Error: ${err.message}. Fallback error: ${fallbackErr.message}`,
+          citations: [],
+          followUps: [],
+          confidence: 0,
+          usedTokens: 0
+        };
+      }
+    }
+  });
+  import_electron2.ipcMain.handle("ask:check-backend", async () => {
+    try {
+      const response = await fetch(`${PYTHON_API_URL}/health/`, {
+        method: "GET",
+        signal: AbortSignal.timeout(3e3)
+      });
+      return { available: response.ok };
+    } catch {
+      return { available: false };
+    }
+  });
+};
+
+// electron/src/ipc/handlers/playground.handlers.ts
+var import_electron3 = require("electron");
+var registerPlaygroundHandlers = () => {
+  import_electron3.ipcMain.handle("playground:run", async (event, request) => {
+    console.log("Playground run request:", JSON.stringify(request, null, 2));
+    await new Promise((resolve2) => setTimeout(resolve2, 800));
+    const { prompt, retrieval, generation } = request;
+    const mockAnswers = {
+      "concise": `Redis is an in-memory data structure store used as a database, cache, and message broker. It supports strings, hashes, lists, sets, and more. Key features include high performance, replication, and persistence options.`,
+      "detailed": `Redis (Remote Dictionary Server) is an open-source, in-memory data structure store. It is widely used as a database, cache, and message broker.
+            
+Key Features:
+- **In-Memory Performance**: Extremely fast read/write operations.
+- **Data Structures**: Supports strings, hashes, lists, sets, sorted sets, bitmaps, hyperloglogs, and geospatial indexes.
+- **Persistence**: functionality to save data to disk via RDB snapshots or AOF logs.
+- **Replication**: Master-slave replication for high availability.
+
+It is often chosen for real-time applications, caching session data, and message queuing systems.`,
+      "bullet_points": `- **Type**: In-memory data structure store
+- **Uses**: Database, Cache, Message Broker
+- **Performance**: High throughput, low latency
+- **Features**: Persistence, Replication, Lua scripting, Transactions`
+    };
+    const style = generation.answerStyle || "detailed";
+    const answer = mockAnswers[style] || mockAnswers["detailed"];
+    const retrievedChunks = [
+      {
+        id: "chunk-1",
+        fileName: "Redis_Caching.md",
+        filePath: "/docs/backend/Redis_Caching.md",
+        content: "Redis is an open source (BSD licensed), in-memory data structure store, used as a database, cache, and message broker.",
+        score: 0.92,
+        highlightRanges: [{ start: 0, end: 5 }]
+      },
+      {
+        id: "chunk-2",
+        fileName: "Architecture_Overview.pdf",
+        filePath: "/docs/architecture/Architecture_Overview.pdf",
+        content: "For our caching layer, we selected Redis due to its support for complex data types and persistence capabilities compared to Memcached.",
+        score: 0.85
+      },
+      {
+        id: "chunk-3",
+        fileName: "Deployment_Guide.md",
+        filePath: "/docs/ops/Deployment_Guide.md",
+        content: "Ensure Redis is configured with maxmemory policy set to allkeys-lru for effective caching behavior.",
+        score: 0.78
+      }
+    ];
+    const limitedChunks = retrievedChunks.slice(0, retrieval.topK || 3);
+    return {
+      answer,
+      retrievedChunks: limitedChunks,
+      debug: {
+        retrievalTimeMs: 120,
+        // Mock time
+        generationTimeMs: 450,
+        // Mock time
+        tokenUsage: {
+          prompt: 156,
+          completion: 85,
+          total: 241
+        },
+        modelName: generation.model || "gpt-4o",
+        finalPrompt: `System: ${prompt.system}
+
+User: ${prompt.user}`
+      }
+    };
+  });
+};
 
 // electron/src/ipc/index.ts
 var registerIpcHandlers = () => {
   init_search_handlers();
-  init_ask_handlers();
   init_favorites_handlers();
   init_insights_handlers();
-  init_playground_handlers();
   init_documents_handlers();
   init_sources_handlers();
+  registerAskHandlers();
+  registerPlaygroundHandlers();
   console.log("IPC handlers registered");
 };
 
@@ -2227,7 +2608,7 @@ var createWindow = () => {
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: path5.join(__dirname, "../preload/index.js"),
+      preload: path8.join(__dirname, "../preload/index.js"),
       nodeIntegration: false,
       contextIsolation: true
     },
@@ -2237,15 +2618,20 @@ var createWindow = () => {
   if (process.env.NODE_ENV === "development" || !import_electron9.app.isPackaged) {
     mainWindow.loadURL("http://localhost:5173");
   } else {
-    mainWindow.loadFile(path5.join(__dirname, "../../../renderer/dist/index.html"));
+    mainWindow.loadFile(path8.join(__dirname, "../../../renderer/dist/index.html"));
   }
 };
+console.log("\n\n==================================================================");
+console.log("   DESKAI ELECTRON MAIN PROCESS STARTED   ");
+console.log("==================================================================\n\n");
 import_electron9.app.whenReady().then(async () => {
   await initDb();
   registerIpcHandlers();
-  const docsPath = path5.join(import_electron9.app.getPath("documents"), "DeskAI_Docs");
-  if (!fs5.existsSync(docsPath)) {
-    fs5.mkdirSync(docsPath, { recursive: true });
+  const { jobQueue: jobQueue2 } = (init_jobQueue(), __toCommonJS(jobQueue_exports));
+  jobQueue2.start();
+  const docsPath = path8.join(import_electron9.app.getPath("documents"), "DeskAI_Docs");
+  if (!fs8.existsSync(docsPath)) {
+    fs8.mkdirSync(docsPath, { recursive: true });
   }
   let source = sourcesRepo.getByPath(docsPath);
   if (!source) {

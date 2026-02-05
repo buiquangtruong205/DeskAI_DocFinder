@@ -1,6 +1,8 @@
 // import { net } from 'electron';
 
-const PYTHON_API_URL = 'http://localhost:8000'; // TODO: Make configurable
+import { logToFile } from '../../utils/fileLogger';
+
+const PYTHON_API_URL = 'http://127.0.0.1:8000'; // Fixed: use IPv4 to avoid Node 18+ fetch issues
 
 export interface ChunkDTO {
     chunkId: string;
@@ -28,11 +30,20 @@ export interface SearchFilters {
 export const pythonClient = {
     async indexChunks(chunks: ChunkDTO[]): Promise<void> {
         try {
+            console.log(`[PythonClient] Sending ${chunks.length} chunks to ${PYTHON_API_URL}/index`);
+
+            // Add timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
             const response = await fetch(`${PYTHON_API_URL}/index`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chunks })
+                body: JSON.stringify({ chunks }),
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 const text = await response.text();
@@ -40,11 +51,11 @@ export const pythonClient = {
             }
 
             const res = await response.json();
-            console.log(`Python indexed ${res.indexed_count} chunks`);
+            console.log(`[PythonClient] Success: Indexed ${res.indexed_count} chunks`);
 
-        } catch (err) {
-            console.error('Failed to send chunks to Python:', err);
-            // Don't crash main process, but log error
+        } catch (err: any) {
+            console.error('[PythonClient] Failed to send chunks to Python:', err);
+            throw err; // Re-throw so Orchestrator handles it as error
         }
     },
 

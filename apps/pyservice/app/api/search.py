@@ -17,13 +17,13 @@ async def search(req: SearchRequest):
         qvec = embedding_service.embed_text(req.query)
         qfilter = build_filter(req.filters)
 
-        res = client.search(
+        res = client.query_points(
             collection_name=COLLECTION,
-            query_vector=qvec,
+            query=qvec,
             query_filter=qfilter,
             limit=req.top_k,
             with_payload=True
-        )
+        ).points
 
         hits = []
         for p in res:

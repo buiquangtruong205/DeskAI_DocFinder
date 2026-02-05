@@ -5,6 +5,7 @@
   "scripts": {
     "dev:desktop": "npm run dev --prefix apps/desktop",
     "dev:electron": "npm run dev:electron --prefix apps/desktop",
+    "dev:backend": "cd apps/pyservice && run_backend.bat",
     "build:electron": "npm run build:electron --prefix apps/desktop"
   },
   "workspaces": [

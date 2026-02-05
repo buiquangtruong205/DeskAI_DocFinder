@@ -65,5 +65,11 @@ export const jobsRepo = {
   getErrorJobs: (): JobRecord[] => {
     const db = getDb();
     return db.prepare("SELECT * FROM jobs WHERE status = 'failed'").all() as JobRecord[];
+  },
+
+  resetProcessingJobs: (): number => {
+    const db = getDb();
+    const result = db.prepare("UPDATE jobs SET status = 'pending' WHERE status = 'processing'").run();
+    return result.changes;
   }
 };
