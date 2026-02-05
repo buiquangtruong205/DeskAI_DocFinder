@@ -79,11 +79,11 @@ export const searchService = {
 
         // 3. Merge Strategies
         if (mode === 'keyword') {
-            results = this.mapKwResults(kwResults);
+            results = this.mapKwResults(kwResults, query);
         } else if (mode === 'semantic') {
             results = await this.mapSemResults(semResults);
         } else {
-            results = await this.mergeHybrid(kwResults, semResults, topK);
+            results = await this.mergeHybrid(kwResults, semResults, topK, query);
         }
 
         return {
@@ -95,39 +95,55 @@ export const searchService = {
         };
     },
 
-    mapKwResults(kwResults: any[]): SearchResult[] {
-        return kwResults.map(r => ({
-            id: r.chunkId,
-            fileId: r.fileId,
-            chunkId: r.chunkId,
-            title: r.name,
-            path: r.path,
-            snippet: r.text, // TODO: generate snippet
-            score: r.score, // bm25 raw score, might need norm
-            matchType: 'keyword',
-            sourceId: r.sourceId
-        }));
+    mapKwResults(kwResults: any[], query: string): SearchResult[] {
+        return kwResults.map(r => {
+            let snippet = r.text || '';
+            // Basic highlighting (case insensitive)
+            if (query && query.length > 2) {
+                const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`(${escapedQuery})`, 'gi');
+                snippet = snippet.replace(regex, '<b>$1</b>');
+            }
+
+            return {
+                id: r.chunkId,
+                fileId: r.fileId,
+                chunkId: r.chunkId,
+                title: r.name,
+                path: r.path,
+                snippet: snippet,
+                score: r.score,
+                matchType: 'keyword',
+                sourceId: r.sourceId
+            };
+        });
     },
 
     async mapSemResults(semResults: any[]): Promise<SearchResult[]> {
-        // Semantic results only have metadata, need to join with File info from DB
         const results: SearchResult[] = [];
+        const { getDb } = require('../storage/db');
+        const db = getDb();
+
         for (const r of semResults) {
-            const fileId = r.metadata.fileId;
+            const fileId = r.file_id || r.payload?.file_id;
             const file = filesRepo.getById(fileId);
+
             if (file) {
-                // Fetch chunk text if not in metadata? Python stores text? 
-                // We sent text to python, so we could assume we get it back or metadata has it.
-                // If not, we fetch from chunksRepo by fileId+index
-                // For now, let's assume we need to join.
+                // Fetch actual text from SQLite chunks if possible
+                let snippet = r.snippet || r.payload?.snippet || '';
+
+                if (r.chunk_id) {
+                    const chunk = db.prepare("SELECT text FROM chunks WHERE id = ?").get(r.chunk_id);
+                    if (chunk) snippet = chunk.text;
+                }
 
                 results.push({
-                    id: `sem-${r.id}`,
+                    id: r.chunk_id || `sem-${r.id}`,
                     fileId: file.id,
-                    chunkId: `sem-${r.id}`, // pseudo ID
+                    chunkId: r.chunk_id,
                     title: file.name,
                     path: file.path,
-                    snippet: "Semantic match...", // We need text from DB ideally
+                    snippet: snippet || "Semantic matching result...",
                     score: r.score,
                     matchType: 'semantic',
                     sourceId: file.sourceId || undefined
@@ -137,30 +153,38 @@ export const searchService = {
         return results;
     },
 
-    async mergeHybrid(kwResults: any[], semResults: any[], limit: number): Promise<SearchResult[]> {
-        // RRF (Reciprocal Rank Fusion)
+    async mergeHybrid(kwResults: any[], semResults: any[], limit: number, query: string): Promise<SearchResult[]> {
         const k = 60;
         const scores = new Map<string, number>();
         const itemMap = new Map<string, any>();
+        const { getDb } = require('../storage/db');
+        const db = getDb();
 
         // 1. Process Keyword Results
         kwResults.forEach((r, idx) => {
-            const key = r.chunkId; // Should be 'fileId_chunkIndex'
+            const key = r.chunkId;
             const rrfScore = 1 / (k + idx + 1);
             scores.set(key, (scores.get(key) || 0) + rrfScore);
 
+            // Highlight keyword snippet
+            let snippet = r.text || '';
+            if (query && query.length > 2) {
+                const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`(${escapedQuery})`, 'gi');
+                snippet = snippet.replace(regex, '<b>$1</b>');
+            }
+
             itemMap.set(key, {
                 ...r,
+                snippet,
                 matchType: 'keyword',
-                // Keep original score for debug if needed, but RRF overrides it
             });
         });
 
         // 2. Process Semantic Results
-        // r is { chunk_id, file_id, score, snippet, payload }
         for (let i = 0; i < semResults.length; i++) {
             const r = semResults[i];
-            const key = r.chunk_id; // 'fileId_chunkIndex'
+            const key = r.chunk_id;
             const rrfScore = 1 / (k + i + 1);
 
             const existingScore = scores.get(key) || 0;
@@ -169,22 +193,23 @@ export const searchService = {
             const existingItem = itemMap.get(key);
 
             if (existingItem) {
-                // If it existed in Keyword, upgrade to Hybrid
                 existingItem.matchType = 'hybrid';
-                // Maybe update snippet if semantic snippet is better? 
-                // Usually keyword snippet (with highlight) is preferred for display if available.
             } else {
-                // New semantic-only match
-                // Need to fetch file details if not present in payload fully
-                // Payload has: title, path, snippet.
+                // New semantic result - fetch text from DB if missing
+                let snippet = r.snippet || r.payload?.snippet || '';
+                if (key) {
+                    const chunk = db.prepare("SELECT text FROM chunks WHERE id = ?").get(key);
+                    if (chunk) snippet = chunk.text;
+                }
+
                 itemMap.set(key, {
                     id: key,
                     fileId: r.file_id || r.payload?.file_id,
                     chunkId: key,
                     title: r.payload?.title || 'Unknown',
                     path: r.payload?.path || 'Unknown',
-                    snippet: r.snippet || r.payload?.snippet || '',
-                    score: 0, // placeholder
+                    snippet: snippet,
+                    score: 0,
                     matchType: 'semantic',
                     sourceId: r.payload?.source_id,
                     tags: r.payload?.tags

@@ -21,17 +21,13 @@ async def index_chunks(req: IndexRequest):
         texts = [c.text for c in req.chunks]
         ids = []
         
-        # Ensure all IDs are valid UUIDs
+        # Use IDs from request if they exist and are unique
+        # Qdrant allows string IDs or UUIDs. 
+        # We will use the chunkId provided by Node.js directly if possible.
         for c in req.chunks:
-            try:
-                # Try to parse as UUID
-                uuid_obj = uuid.UUID(c.chunkId)
-                ids.append(str(uuid_obj))
-            except ValueError:
-                # If not valid UUID, generate a new one
-                new_id = str(uuid.uuid4())
-                ids.append(new_id)
-                print(f"Generated new UUID {new_id} for invalid ID: {c.chunkId}")
+            # We'll just use the chunkId as is. If it's not a valid UUID, 
+            # Qdrant will still accept it as a string ID since v0.10.0+
+            ids.append(c.chunkId)
         
         # Batch Embed
         embeddings = embedding_service.embed_batch(texts)
@@ -59,6 +55,32 @@ async def index_chunks(req: IndexRequest):
         )
         
         return IndexResponse(indexed_count=len(points))
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete('/delete/{file_id}')
+async def delete_file(file_id: str):
+    try:
+        client = get_client()
+        ensure_collection(client)
+
+        # Delete by metadata filter
+        client.delete(
+            collection_name=COLLECTION,
+            points_selector=qm.Filter(
+                must=[
+                    qm.FieldCondition(
+                        key="file_id",
+                        match=qm.MatchValue(value=file_id)
+                    )
+                ]
+            )
+        )
+        
+        return {"status": "success", "file_id": file_id}
 
     except Exception as e:
         import traceback

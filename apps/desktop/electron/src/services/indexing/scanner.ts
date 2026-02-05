@@ -130,50 +130,49 @@ export class FileScanner extends EventEmitter {
   }
 
   private async recursiveScan(dir: string, excludePatterns: string[] = []): Promise<{ path: string, size: number, mtime: number }[]> {
-    let results: { path: string, size: number, mtime: number }[] = [];
-
     // Default system excludes
     const systemExcludes = ['node_modules', '.git', 'dist', 'build', 'coverage', '__pycache__'];
     const allExcludes = [...systemExcludes, ...excludePatterns];
 
     try {
       const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-      console.log(`[Scanner] Reading dir: ${dir}, entries found: ${entries.length}`);
+      // console.log(`[Scanner] Reading dir: ${dir}, entries found: ${entries.length}`);
 
-      for (const entry of entries) {
+      const scanResults = await Promise.all(entries.map(async (entry) => {
         const resPath = path.resolve(dir, entry.name);
 
         // Check excludes
         if (allExcludes.some(pattern => resPath.includes(pattern))) {
-          // console.log(`[Scanner] Excluding: ${resPath}`); // Too verbose?
-          continue;
+          return [];
         }
 
         if (entry.isDirectory()) {
-          const subResults = await this.recursiveScan(resPath, excludePatterns);
-          results = results.concat(subResults);
+          return await this.recursiveScan(resPath, excludePatterns);
         } else {
           // It's a file
           try {
             const stats = await fs.promises.stat(resPath);
             // Skip large files (e.g. > 10MB)
-            if (stats.size > 10 * 1024 * 1024) continue;
+            if (stats.size > 10 * 1024 * 1024) return [];
 
-            results.push({
+            return [{
               path: resPath,
               size: stats.size,
               mtime: stats.mtimeMs
-            });
+            }];
           } catch (e) {
             // ignore stat errors (locked files etc)
+            return [];
           }
         }
-      }
+      }));
+
+      return scanResults.flat();
     } catch (e) {
       // ignore access errors
       console.error(`Error reading dir ${dir}:`, e);
+      return [];
     }
-    return results;
   }
 }
 

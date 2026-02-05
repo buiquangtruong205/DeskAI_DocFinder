@@ -48,7 +48,6 @@ console.log("==================================================================\
 
 app.whenReady().then(async () => {
   await initDb();
-  // registerSearchHandlers(); // Removed, covered by registerIpcHandlers
   registerIpcHandlers();
 
   // Start Job Queue Worker
@@ -56,8 +55,7 @@ app.whenReady().then(async () => {
   jobQueue.start();
 
   // Start scanning default docs folder for MVP
-  // In real app, this should be user configurable via IPC
-  const docsPath = path.join(app.getPath('documents'), 'DeskAI_Docs'); // Example
+  const docsPath = path.join(app.getPath('documents'), 'DeskAI_Docs');
   if (!fs.existsSync(docsPath)) {
     fs.mkdirSync(docsPath, { recursive: true });
   }
@@ -65,7 +63,7 @@ app.whenReady().then(async () => {
   // Ensure source exists in DB
   let source = sourcesRepo.getByPath(docsPath);
   if (!source) {
-    console.log('Creating default source:', docsPath);
+    console.log('[Main] Creating default source:', docsPath);
     source = sourcesRepo.create({
       name: 'My Docs',
       path: docsPath,
@@ -73,23 +71,20 @@ app.whenReady().then(async () => {
     });
   }
 
-  // Scan the source
-  fileScanner.scanSource(source.id, docsPath).catch(err => console.error("Startup scan failed:", err));
+  // Initial background scan of the default source
+  fileScanner.scanSource(source.id, docsPath).catch(err => {
+    console.error("[Main] Startup scan failed:", err);
+  });
 
   createWindow();
 
   app.on('activate', () => {
-    // On OS X it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
 });
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();

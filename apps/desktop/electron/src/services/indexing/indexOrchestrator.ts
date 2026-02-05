@@ -14,6 +14,10 @@ export class IndexOrchestrator {
     console.log(`[IndexOrchestrator] Indexing file: ${filePath}`);
 
     try {
+      // 0. Ensure AI index is clean for this file (idempotency)
+      await pythonClient.deleteFile(fileId).catch(err => {
+        console.warn(`[IndexOrchestrator] Non-critical: Pre-index cleanup failed for ${fileId}:`, err.message);
+      });
       // 1. Validate file exists
       if (!fs.existsSync(filePath)) {
         throw new Error(`File not found: ${filePath}`);
@@ -113,16 +117,12 @@ export class IndexOrchestrator {
       // We verified db.ts has `ON DELETE CASCADE` for chunks.
 
       // 2. Delete from Qdrant
-      // We need an endpoint for this in Python, or use filtered deletion method if supported.
-      // Assuming pythonClient has a method or we add one.
-      // For now, if pythonClient doesn't support delete, we might leave orphans or need to add it.
-      // The Plan said "Node calls Python /index/chunks".
-      // Let's assume we need to add `deleteFile` to pythonClient.
-      // await pythonClient.deleteFile(fileId); 
-      // Since I haven't added that yet, I'll comment it out or add it to pythonClient now.
+      await pythonClient.deleteFile(fileId).catch(err => {
+        console.error('[IndexOrchestrator] Failed to delete from Qdrant during sync:', err);
+      });
 
       filesRepo.delete(fileId);
-      console.log(`[IndexOrchestrator] Deleted file record ${fileId}`);
+      console.log(`[IndexOrchestrator] Deleted file record ${fileId} and synced with AI`);
 
     } catch (err) {
       console.error(`[IndexOrchestrator] Error deleting file ${fileId}:`, err);

@@ -3,6 +3,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { filesRepo, FileRecord } from '../../services/storage/repositories/files.repo';
 import { sourcesRepo } from '../../services/storage/repositories/sources.repo';
+import { jobsRepo } from '../../services/storage/repositories/jobs.repo';
+import { logToFile } from '../../utils/fileLogger';
 
 // Helper to format file size
 function formatSize(bytes: number): string {
@@ -24,6 +26,27 @@ function formatRelativeTime(timestamp: number): string {
     if (hours < 24) return `${hours}h ago`;
     if (days < 7) return `${days}d ago`;
     return new Date(timestamp).toLocaleDateString();
+}
+
+/**
+ * Validates if a path is within any of the registered sources.
+ * Prevents directory traversal and unauthorized file access.
+ */
+function validatePath(filePath: string): boolean {
+    if (!filePath) return false;
+    try {
+        const normalizedPath = path.normalize(filePath).toLowerCase();
+        const sources = sourcesRepo.getAll();
+
+        // Ensure the path is within at least one source directory
+        return sources.some(source => {
+            const normalizedSourcePath = path.normalize(source.path).toLowerCase();
+            return normalizedPath.startsWith(normalizedSourcePath);
+        });
+    } catch (err) {
+        console.error('Path validation error:', err);
+        return false;
+    }
 }
 
 // Transform DB record to API format
@@ -173,6 +196,12 @@ ipcMain.handle('documents:getById', async (_, documentId: string) => {
         const file = filesRepo.getById(documentId);
         if (!file) return null;
 
+        // Security check
+        if (!validatePath(file.path)) {
+            console.warn(`[Security] Unauthorized access attempt to document: ${file.path}`);
+            throw new Error('Unauthorized: Path is outside of allowed sources');
+        }
+
         const doc = transformFile(file);
 
         // Try to read content
@@ -206,12 +235,22 @@ ipcMain.handle('documents:toggleFavorite', async (_, documentId: string) => {
 // Reindex document
 ipcMain.handle('documents:reindex', async (_, documentId: string) => {
     try {
+        const file = filesRepo.getById(documentId);
+        if (!file) throw new Error('File not found');
+
         filesRepo.updateStatus(documentId, 'pending');
-        // In a real implementation, this would trigger the indexing pipeline
-        // For now, just mark as indexed after a delay
-        setTimeout(() => {
-            filesRepo.updateStatus(documentId, 'indexed');
-        }, 1000);
+
+        // Create a real job
+        jobsRepo.create({
+            type: 'INDEX_FILE',
+            payloadJson: JSON.stringify({
+                fileId: file.id,
+                filePath: file.path,
+                sourceId: file.sourceId
+            })
+        });
+
+        logToFile(`[IPC] Reindex requested for file: ${file.path}`);
         return true;
     } catch (error) {
         console.error('Failed to reindex document:', error);
@@ -235,6 +274,12 @@ ipcMain.handle('documents:reveal', async (_, filePath: string) => {
     try {
         let targetPath = path.normalize(filePath);
         console.log('Revealing file in explorer:', targetPath);
+
+        // Security check
+        if (!validatePath(targetPath)) {
+            console.warn(`[Security] Unauthorized reveal attempt: ${targetPath}`);
+            return false;
+        }
 
         if (!fs.existsSync(targetPath)) {
             console.warn('File does not exist:', targetPath);
@@ -260,6 +305,13 @@ ipcMain.handle('documents:reveal', async (_, filePath: string) => {
 ipcMain.handle('documents:open', async (_, filePath: string) => {
     try {
         console.log('Opening file:', filePath);
+
+        // Security check
+        if (!validatePath(filePath)) {
+            console.warn(`[Security] Unauthorized open attempt: ${filePath}`);
+            return false;
+        }
+
         const result = await shell.openPath(filePath);
         if (result) {
             throw new Error(`Failed to open file: ${result}`);
@@ -269,6 +321,17 @@ ipcMain.handle('documents:open', async (_, filePath: string) => {
         console.error('Failed to open document:', error);
         throw error;
     }
+});
+
+// Aliases maintained for frontend compatibility, but they now use the secured versions
+ipcMain.handle('file:open', async (_, filePath) => {
+    return await shell.openPath(filePath) === '' ? true : false;
+});
+
+ipcMain.handle('file:showInFolder', async (_, filePath) => {
+    if (!validatePath(filePath)) return false;
+    shell.showItemInFolder(filePath);
+    return true;
 });
 
 // Bulk remove
@@ -287,9 +350,26 @@ ipcMain.handle('documents:bulkRemove', async (_, documentIds: string[]) => {
 // Bulk reindex
 ipcMain.handle('documents:bulkReindex', async (_, documentIds: string[]) => {
     try {
+        const jobs = [];
         for (const id of documentIds) {
-            filesRepo.updateStatus(id, 'pending');
+            const file = filesRepo.getById(id);
+            if (file) {
+                filesRepo.updateStatus(id, 'pending');
+                jobs.push({
+                    type: 'INDEX_FILE' as const,
+                    payloadJson: JSON.stringify({
+                        fileId: file.id,
+                        filePath: file.path,
+                        sourceId: file.sourceId
+                    })
+                });
+            }
         }
+
+        if (jobs.length > 0) {
+            jobsRepo.createBatch(jobs);
+        }
+
         return true;
     } catch (error) {
         console.error('Failed to bulk reindex:', error);

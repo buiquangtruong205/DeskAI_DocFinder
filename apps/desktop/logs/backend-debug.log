@@ -162,3 +162,20 @@
 [2026-02-05T06:48:45.114Z] [JobQueue] Starting job queue worker
 [2026-02-05T06:48:45.118Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
 [2026-02-05T06:48:45.219Z] [FileScanner] No changes detected
+[2026-02-05T08:15:51.355Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T08:15:51.356Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T08:15:51.356Z] [JobQueue] Starting job queue worker
+[2026-02-05T08:15:51.362Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T08:15:51.430Z] [FileScanner] No changes detected
+[2026-02-05T08:28:44.833Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T08:28:44.835Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T08:28:44.835Z] [JobQueue] Starting job queue worker
+[2026-02-05T08:28:44.837Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T08:28:44.933Z] [FileScanner] No changes detected
+[2026-02-05T08:40:10.294Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\Visual Studio 2022
+[2026-02-05T08:40:10.355Z] [FileScanner] No changes detected
+[2026-02-05T08:47:54.781Z] [JobQueue] Resetting stuck jobs...
+[2026-02-05T08:47:54.783Z] [JobQueue] Reset 0 stuck jobs
+[2026-02-05T08:47:54.783Z] [JobQueue] Starting job queue worker
+[2026-02-05T08:47:54.785Z] [FileScanner] Scanning source: C:\Users\Admin\OneDrive\Tài liệu\DeskAI_Docs
+[2026-02-05T08:47:54.884Z] [FileScanner] No changes detected

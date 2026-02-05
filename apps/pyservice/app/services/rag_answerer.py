@@ -46,7 +46,7 @@ if LLM_PROVIDER == "ollama":
     print(f"Using Ollama at {OLLAMA_URL} with model {OLLAMA_MODEL}")
 
 
-def build_context_string(chunks: List[Dict], max_chunk_chars: int = 400, max_total_chars: int = 2500) -> str:
+def build_context_string(chunks: List[Dict], max_chunk_chars: int = 2000, max_total_chars: int = 15000) -> str:
     """Build optimized context string from retrieved chunks - reduced size to save quota"""
     if not chunks:
         return "No relevant documents found."

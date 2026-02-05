@@ -71,5 +71,18 @@ export const jobsRepo = {
     const db = getDb();
     const result = db.prepare("UPDATE jobs SET status = 'pending' WHERE status = 'processing'").run();
     return result.changes;
+  },
+
+  deleteByFileId: (fileId: string) => {
+    const db = getDb();
+    // Search for fileId inside payloadJson using SQLite JSON functions
+    const stmt = db.prepare("DELETE FROM jobs WHERE json_extract(payloadJson, '$.fileId') = ?");
+    return stmt.run(fileId).changes;
+  },
+
+  deleteBySourceId: (sourceId: string) => {
+    const db = getDb();
+    const stmt = db.prepare("DELETE FROM jobs WHERE json_extract(payloadJson, '$.sourceId') = ?");
+    return stmt.run(sourceId).changes;
   }
 };

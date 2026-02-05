@@ -30,6 +30,8 @@ export async function initDb() {
 
   // Enable WAL mode for better concurrency
   db.pragma('journal_mode = WAL');
+  // Enable Foreign Key enforcement (CRITICAL for data integrity)
+  db.pragma('foreign_keys = ON');
 
   // Check for legacy favorites table and drop if incompatible (refJson is old column)
   try {

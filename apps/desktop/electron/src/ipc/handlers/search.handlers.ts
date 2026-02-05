@@ -27,25 +27,26 @@ ipcMain.handle('search:openFile', async (event, filePath) => {
 
 ipcMain.handle('search:addFavorite', async (event, item) => {
   console.log('Adding to favorites:', item);
-  // Todo: call favoritesRepo.add(item)
-  // For now we trust frontend to call favorites store/service which might call this IPC
-  // Check if we need a repo for favorites. task.md said "favorites (nếu có nút Save) id, type...". 
-  // We added table to db.ts. We need favorites.repo.ts potentially or just direct DB insert here.
-  // Let's assume for MVP we might skip complex Fav logic unless requested.
-  // User asked "Save purpose: lưu vào Favorites... insert into table favorites".
-  // So I should implement it.
-  const { v4: uuidv4 } = require('uuid');
-  const { getDb } = require('../../services/storage/db');
+  const { addFavorite } = require('../../services/storage/repositories/favorites.repo');
 
   try {
-    const db = getDb();
-    const id = uuidv4();
-    db.prepare("INSERT INTO favorites (id, type, refJson, createdAt) VALUES (?, ?, ?, ?)").run(
-      id,
-      item.type || 'SNIPPET', // DOCUMENT|SNIPPET|ANSWER
-      JSON.stringify(item),
-      Date.now()
-    );
+    // Map SearchResult to AddFavoritePayload
+    // SearchResult mapping: id -> ref.chunkId, title -> title, path -> ref.path
+    // FavoriteKind: 'DOCUMENT' (if full file) or 'SNIPPET' (if chunk)
+    const kind = item.chunkId ? 'SNIPPET' : 'DOCUMENT';
+
+    addFavorite({
+      kind,
+      title: item.title,
+      ref: {
+        fileId: item.fileId,
+        chunkId: item.chunkId,
+        path: item.path,
+        snippet: item.snippet
+      },
+      tags: item.tags || []
+    });
+
     return { success: true };
   } catch (err: any) {
     console.error('Failed to add favorite:', err);

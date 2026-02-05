@@ -1,5 +1,6 @@
 import { getDb } from '../db';
 import { v4 as uuidv4 } from 'uuid';
+import { jobsRepo } from './jobs.repo';
 
 export interface SourceRecord {
     id: string;
@@ -126,6 +127,8 @@ export const sourcesRepo = {
 
     delete: (id: string) => {
         const db = getDb();
+        // Clean up jobs first
+        jobsRepo.deleteBySourceId(id);
         const stmt = db.prepare('DELETE FROM sources WHERE id = ?');
         stmt.run(id);
     },

@@ -1,5 +1,6 @@
 import { getDb } from '../db';
 import { v4 as uuidv4 } from 'uuid';
+import { jobsRepo } from './jobs.repo';
 
 export interface FileRecord {
   id: string;
@@ -65,12 +66,16 @@ export const filesRepo = {
 
   delete: (id: string) => {
     const db = getDb();
+    // Clean up jobs first
+    jobsRepo.deleteByFileId(id);
     const stmt = db.prepare('DELETE FROM files WHERE id = ?');
     stmt.run(id);
   },
 
   deleteBySourceId: (sourceId: string) => {
     const db = getDb();
+    // Clean up all jobs for all files in this source
+    jobsRepo.deleteBySourceId(sourceId);
     const stmt = db.prepare('DELETE FROM files WHERE sourceId = ?');
     stmt.run(sourceId);
   },

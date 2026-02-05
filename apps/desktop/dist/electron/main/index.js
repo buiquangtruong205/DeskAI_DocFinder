@@ -55,6 +55,7 @@ async function initDb() {
   }
   db = new import_better_sqlite3.default(dbPath, { verbose: console.log });
   db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
   try {
     const favInfo = db.pragma("table_info(favorites)");
     if (favInfo && favInfo.length > 0 && favInfo.some((c) => c.name === "refJson")) {
@@ -219,17 +220,92 @@ var init_db = __esm({
   }
 });
 
+// electron/src/services/storage/repositories/jobs.repo.ts
+var import_uuid, jobsRepo;
+var init_jobs_repo = __esm({
+  "electron/src/services/storage/repositories/jobs.repo.ts"() {
+    "use strict";
+    init_db();
+    import_uuid = require("uuid");
+    jobsRepo = {
+      create: (job) => {
+        const db2 = getDb();
+        const id = (0, import_uuid.v4)();
+        const createdAt = Date.now();
+        const stmt = db2.prepare(`
+      INSERT INTO jobs (id, type, status, payloadJson, error, createdAt)
+      VALUES (@id, @type, 'pending', @payloadJson, NULL, @createdAt)
+    `);
+        stmt.run({ ...job, id, createdAt });
+        return id;
+      },
+      createBatch: (jobs) => {
+        const db2 = getDb();
+        const insert = db2.prepare(`
+      INSERT INTO jobs (id, type, status, payloadJson, error, createdAt)
+      VALUES (@id, @type, 'pending', @payloadJson, NULL, @createdAt)
+    `);
+        const insertMany = db2.transaction((jobsList) => {
+          for (const job of jobsList) {
+            insert.run({
+              id: (0, import_uuid.v4)(),
+              type: job.type,
+              payloadJson: job.payloadJson,
+              createdAt: Date.now()
+            });
+          }
+        });
+        insertMany(jobs);
+      },
+      getNextJob: () => {
+        const db2 = getDb();
+        const stmt = db2.prepare("SELECT * FROM jobs WHERE status = ? ORDER BY createdAt ASC LIMIT 1");
+        return stmt.get("pending");
+      },
+      updateStatus: (id, status, error) => {
+        const db2 = getDb();
+        const stmt = db2.prepare("UPDATE jobs SET status = ?, error = ? WHERE id = ?");
+        stmt.run(status, error || null, id);
+      },
+      clearCompleted: () => {
+        const db2 = getDb();
+        db2.prepare("DELETE FROM jobs WHERE status = 'completed'").run();
+      },
+      getErrorJobs: () => {
+        const db2 = getDb();
+        return db2.prepare("SELECT * FROM jobs WHERE status = 'failed'").all();
+      },
+      resetProcessingJobs: () => {
+        const db2 = getDb();
+        const result = db2.prepare("UPDATE jobs SET status = 'pending' WHERE status = 'processing'").run();
+        return result.changes;
+      },
+      deleteByFileId: (fileId) => {
+        const db2 = getDb();
+        const stmt = db2.prepare("DELETE FROM jobs WHERE json_extract(payloadJson, '$.fileId') = ?");
+        return stmt.run(fileId).changes;
+      },
+      deleteBySourceId: (sourceId) => {
+        const db2 = getDb();
+        const stmt = db2.prepare("DELETE FROM jobs WHERE json_extract(payloadJson, '$.sourceId') = ?");
+        return stmt.run(sourceId).changes;
+      }
+    };
+  }
+});
+
 // electron/src/services/storage/repositories/files.repo.ts
-var import_uuid, filesRepo;
+var import_uuid2, filesRepo;
 var init_files_repo = __esm({
   "electron/src/services/storage/repositories/files.repo.ts"() {
     "use strict";
     init_db();
-    import_uuid = require("uuid");
+    import_uuid2 = require("uuid");
+    init_jobs_repo();
     filesRepo = {
       create: (file) => {
         const db2 = getDb();
-        const id = (0, import_uuid.v4)();
+        const id = (0, import_uuid2.v4)();
         const stmt = db2.prepare(`
       INSERT INTO files (id, path, sourceId, name, extension, type, size, mtime, indexedAt, status, hash, isFavorite, errorMessage)
       VALUES (@id, @path, @sourceId, @name, @extension, @type, @size, @mtime, @indexedAt, @status, @hash, 0, NULL)
@@ -259,11 +335,13 @@ var init_files_repo = __esm({
       },
       delete: (id) => {
         const db2 = getDb();
+        jobsRepo.deleteByFileId(id);
         const stmt = db2.prepare("DELETE FROM files WHERE id = ?");
         stmt.run(id);
       },
       deleteBySourceId: (sourceId) => {
         const db2 = getDb();
+        jobsRepo.deleteBySourceId(sourceId);
         const stmt = db2.prepare("DELETE FROM files WHERE sourceId = ?");
         stmt.run(sourceId);
       },
@@ -365,70 +443,6 @@ var init_files_repo = __esm({
   }
 });
 
-// electron/src/services/storage/repositories/jobs.repo.ts
-var import_uuid2, jobsRepo;
-var init_jobs_repo = __esm({
-  "electron/src/services/storage/repositories/jobs.repo.ts"() {
-    "use strict";
-    init_db();
-    import_uuid2 = require("uuid");
-    jobsRepo = {
-      create: (job) => {
-        const db2 = getDb();
-        const id = (0, import_uuid2.v4)();
-        const createdAt = Date.now();
-        const stmt = db2.prepare(`
-      INSERT INTO jobs (id, type, status, payloadJson, error, createdAt)
-      VALUES (@id, @type, 'pending', @payloadJson, NULL, @createdAt)
-    `);
-        stmt.run({ ...job, id, createdAt });
-        return id;
-      },
-      createBatch: (jobs) => {
-        const db2 = getDb();
-        const insert = db2.prepare(`
-      INSERT INTO jobs (id, type, status, payloadJson, error, createdAt)
-      VALUES (@id, @type, 'pending', @payloadJson, NULL, @createdAt)
-    `);
-        const insertMany = db2.transaction((jobsList) => {
-          for (const job of jobsList) {
-            insert.run({
-              id: (0, import_uuid2.v4)(),
-              type: job.type,
-              payloadJson: job.payloadJson,
-              createdAt: Date.now()
-            });
-          }
-        });
-        insertMany(jobs);
-      },
-      getNextJob: () => {
-        const db2 = getDb();
-        const stmt = db2.prepare("SELECT * FROM jobs WHERE status = ? ORDER BY createdAt ASC LIMIT 1");
-        return stmt.get("pending");
-      },
-      updateStatus: (id, status, error) => {
-        const db2 = getDb();
-        const stmt = db2.prepare("UPDATE jobs SET status = ?, error = ? WHERE id = ?");
-        stmt.run(status, error || null, id);
-      },
-      clearCompleted: () => {
-        const db2 = getDb();
-        db2.prepare("DELETE FROM jobs WHERE status = 'completed'").run();
-      },
-      getErrorJobs: () => {
-        const db2 = getDb();
-        return db2.prepare("SELECT * FROM jobs WHERE status = 'failed'").all();
-      },
-      resetProcessingJobs: () => {
-        const db2 = getDb();
-        const result = db2.prepare("UPDATE jobs SET status = 'pending' WHERE status = 'processing'").run();
-        return result.changes;
-      }
-    };
-  }
-});
-
 // electron/src/utils/fileLogger.ts
 function logToFile(message, data) {
   const timestamp = (/* @__PURE__ */ new Date()).toISOString();
@@ -476,6 +490,7 @@ var init_sources_repo = __esm({
     "use strict";
     init_db();
     import_uuid3 = require("uuid");
+    init_jobs_repo();
     sourcesRepo = {
       create: (input) => {
         const db2 = getDb();
@@ -556,6 +571,7 @@ var init_sources_repo = __esm({
       },
       delete: (id) => {
         const db2 = getDb();
+        jobsRepo.deleteBySourceId(id);
         const stmt = db2.prepare("DELETE FROM sources WHERE id = ?");
         stmt.run(id);
       },
@@ -712,38 +728,37 @@ var init_scanner = __esm({
         }
       }
       async recursiveScan(dir, excludePatterns = []) {
-        let results = [];
         const systemExcludes = ["node_modules", ".git", "dist", "build", "coverage", "__pycache__"];
         const allExcludes = [...systemExcludes, ...excludePatterns];
         try {
           const entries = await fs3.promises.readdir(dir, { withFileTypes: true });
-          console.log(`[Scanner] Reading dir: ${dir}, entries found: ${entries.length}`);
-          for (const entry of entries) {
+          const scanResults = await Promise.all(entries.map(async (entry) => {
             const resPath = path3.resolve(dir, entry.name);
             if (allExcludes.some((pattern) => resPath.includes(pattern))) {
-              continue;
+              return [];
             }
             if (entry.isDirectory()) {
-              const subResults = await this.recursiveScan(resPath, excludePatterns);
-              results = results.concat(subResults);
+              return await this.recursiveScan(resPath, excludePatterns);
             } else {
               try {
                 const stats = await fs3.promises.stat(resPath);
                 if (stats.size > 10 * 1024 * 1024)
-                  continue;
-                results.push({
+                  return [];
+                return [{
                   path: resPath,
                   size: stats.size,
                   mtime: stats.mtimeMs
-                });
+                }];
               } catch (e) {
+                return [];
               }
             }
-          }
+          }));
+          return scanResults.flat();
         } catch (e) {
           console.error(`Error reading dir ${dir}:`, e);
+          return [];
         }
-        return results;
       }
     };
     fileScanner = new FileScanner();
@@ -829,33 +844,67 @@ var init_chunks_repo = __esm({
 });
 
 // electron/src/services/search/pythonClient.ts
-var PYTHON_API_URL2, pythonClient;
+var PYTHON_API_URL2, failureCount, lastFailureTime, FAILURE_THRESHOLD, COOLDOWN_MS, pythonClient;
 var init_pythonClient = __esm({
   "electron/src/services/search/pythonClient.ts"() {
     "use strict";
     PYTHON_API_URL2 = "http://127.0.0.1:8000";
+    failureCount = 0;
+    lastFailureTime = 0;
+    FAILURE_THRESHOLD = 3;
+    COOLDOWN_MS = 3e4;
     pythonClient = {
       async indexChunks(chunks) {
+        if (!chunks.length)
+          return;
+        if (failureCount >= FAILURE_THRESHOLD && Date.now() - lastFailureTime < COOLDOWN_MS) {
+          console.warn("[PythonClient] Circuit breaker active. Skipping request.");
+          throw new Error("AI backend is currently unavailable (Circuit Breaker active)");
+        }
+        const BATCH_SIZE = 50;
+        console.log(`[PythonClient] Processing ${chunks.length} chunks in batches of ${BATCH_SIZE}`);
+        for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+          const batch = chunks.slice(i, i + BATCH_SIZE);
+          try {
+            console.log(`[PythonClient] Sending batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)}`);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15e3);
+            const response = await fetch(`${PYTHON_API_URL2}/index`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chunks: batch }),
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+              const text = await response.text();
+              failureCount++;
+              lastFailureTime = Date.now();
+              throw new Error(`Python indexing failed: ${text}`);
+            }
+            failureCount = 0;
+          } catch (err) {
+            if (err.name === "AbortError") {
+              failureCount++;
+              lastFailureTime = Date.now();
+              throw new Error(`AI backend request timed out at batch ${i / BATCH_SIZE + 1}`);
+            }
+            throw err;
+          }
+        }
+      },
+      async deleteFile(fileId) {
         try {
-          console.log(`[PythonClient] Sending ${chunks.length} chunks to ${PYTHON_API_URL2}/index`);
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 1e4);
-          const response = await fetch(`${PYTHON_API_URL2}/index`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chunks }),
-            signal: controller.signal
+          console.log(`[PythonClient] Deleting file ${fileId} from AI index`);
+          const response = await fetch(`${PYTHON_API_URL2}/index/delete/${fileId}`, {
+            method: "DELETE"
           });
-          clearTimeout(timeoutId);
           if (!response.ok) {
             const text = await response.text();
-            throw new Error(`Python indexing failed: ${text}`);
+            console.error(`[PythonClient] Failed to delete file from AI: ${text}`);
           }
-          const res = await response.json();
-          console.log(`[PythonClient] Success: Indexed ${res.indexed_count} chunks`);
         } catch (err) {
-          console.error("[PythonClient] Failed to send chunks to Python:", err);
-          throw err;
+          console.error("[PythonClient] Error calling delete API:", err);
         }
       },
       async search(query, filters, topK = 20) {
@@ -939,11 +988,11 @@ var init_searchService = __esm({
           semResults = await pythonClient.search(query, void 0, topK);
         }
         if (mode === "keyword") {
-          results = this.mapKwResults(kwResults);
+          results = this.mapKwResults(kwResults, query);
         } else if (mode === "semantic") {
           results = await this.mapSemResults(semResults);
         } else {
-          results = await this.mergeHybrid(kwResults, semResults, topK);
+          results = await this.mergeHybrid(kwResults, semResults, topK, query);
         }
         return {
           results,
@@ -954,36 +1003,48 @@ var init_searchService = __esm({
           }
         };
       },
-      mapKwResults(kwResults) {
-        return kwResults.map((r) => ({
-          id: r.chunkId,
-          fileId: r.fileId,
-          chunkId: r.chunkId,
-          title: r.name,
-          path: r.path,
-          snippet: r.text,
-          // TODO: generate snippet
-          score: r.score,
-          // bm25 raw score, might need norm
-          matchType: "keyword",
-          sourceId: r.sourceId
-        }));
+      mapKwResults(kwResults, query) {
+        return kwResults.map((r) => {
+          let snippet = r.text || "";
+          if (query && query.length > 2) {
+            const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const regex = new RegExp(`(${escapedQuery})`, "gi");
+            snippet = snippet.replace(regex, "<b>$1</b>");
+          }
+          return {
+            id: r.chunkId,
+            fileId: r.fileId,
+            chunkId: r.chunkId,
+            title: r.name,
+            path: r.path,
+            snippet,
+            score: r.score,
+            matchType: "keyword",
+            sourceId: r.sourceId
+          };
+        });
       },
       async mapSemResults(semResults) {
         const results = [];
+        const { getDb: getDb2 } = (init_db(), __toCommonJS(db_exports));
+        const db2 = getDb2();
         for (const r of semResults) {
-          const fileId = r.metadata.fileId;
+          const fileId = r.file_id || r.payload?.file_id;
           const file = filesRepo.getById(fileId);
           if (file) {
+            let snippet = r.snippet || r.payload?.snippet || "";
+            if (r.chunk_id) {
+              const chunk = db2.prepare("SELECT text FROM chunks WHERE id = ?").get(r.chunk_id);
+              if (chunk)
+                snippet = chunk.text;
+            }
             results.push({
-              id: `sem-${r.id}`,
+              id: r.chunk_id || `sem-${r.id}`,
               fileId: file.id,
-              chunkId: `sem-${r.id}`,
-              // pseudo ID
+              chunkId: r.chunk_id,
               title: file.name,
               path: file.path,
-              snippet: "Semantic match...",
-              // We need text from DB ideally
+              snippet: snippet || "Semantic matching result...",
               score: r.score,
               matchType: "semantic",
               sourceId: file.sourceId || void 0
@@ -992,18 +1053,26 @@ var init_searchService = __esm({
         }
         return results;
       },
-      async mergeHybrid(kwResults, semResults, limit) {
+      async mergeHybrid(kwResults, semResults, limit, query) {
         const k = 60;
         const scores = /* @__PURE__ */ new Map();
         const itemMap = /* @__PURE__ */ new Map();
+        const { getDb: getDb2 } = (init_db(), __toCommonJS(db_exports));
+        const db2 = getDb2();
         kwResults.forEach((r, idx) => {
           const key = r.chunkId;
           const rrfScore = 1 / (k + idx + 1);
           scores.set(key, (scores.get(key) || 0) + rrfScore);
+          let snippet = r.text || "";
+          if (query && query.length > 2) {
+            const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const regex = new RegExp(`(${escapedQuery})`, "gi");
+            snippet = snippet.replace(regex, "<b>$1</b>");
+          }
           itemMap.set(key, {
             ...r,
+            snippet,
             matchType: "keyword"
-            // Keep original score for debug if needed, but RRF overrides it
           });
         });
         for (let i = 0; i < semResults.length; i++) {
@@ -1016,15 +1085,20 @@ var init_searchService = __esm({
           if (existingItem) {
             existingItem.matchType = "hybrid";
           } else {
+            let snippet = r.snippet || r.payload?.snippet || "";
+            if (key) {
+              const chunk = db2.prepare("SELECT text FROM chunks WHERE id = ?").get(key);
+              if (chunk)
+                snippet = chunk.text;
+            }
             itemMap.set(key, {
               id: key,
               fileId: r.file_id || r.payload?.file_id,
               chunkId: key,
               title: r.payload?.title || "Unknown",
               path: r.payload?.path || "Unknown",
-              snippet: r.snippet || r.payload?.snippet || "",
+              snippet,
               score: 0,
-              // placeholder
               matchType: "semantic",
               sourceId: r.payload?.source_id,
               tags: r.payload?.tags
@@ -1056,97 +1130,21 @@ var init_searchService = __esm({
   }
 });
 
-// electron/src/ipc/handlers/search.handlers.ts
-var search_handlers_exports = {};
-var import_electron4;
-var init_search_handlers = __esm({
-  "electron/src/ipc/handlers/search.handlers.ts"() {
-    "use strict";
-    import_electron4 = require("electron");
-    init_searchService();
-    init_files_repo();
-    import_electron4.ipcMain.handle("search:query", async (event, { query, options }) => {
-      try {
-        console.log("[search:query] Request:", query, options);
-        const { results, stats } = await searchService.search(query, options);
-        return { success: true, results, stats };
-      } catch (err) {
-        console.error("[search:query] Error:", err);
-        return { success: false, error: err.message || "Search failed" };
-      }
-    });
-    import_electron4.ipcMain.handle("search:openFile", async (event, filePath) => {
-      console.log("Opening file:", filePath);
-      try {
-        await import_electron4.shell.openPath(filePath);
-        return { success: true, message: `Opened ${filePath}` };
-      } catch (err) {
-        console.error("Failed to open file:", err);
-        return { success: false, error: err.message };
-      }
-    });
-    import_electron4.ipcMain.handle("search:addFavorite", async (event, item) => {
-      console.log("Adding to favorites:", item);
-      const { v4: uuidv45 } = require("uuid");
-      const { getDb: getDb2 } = (init_db(), __toCommonJS(db_exports));
-      try {
-        const db2 = getDb2();
-        const id = uuidv45();
-        db2.prepare("INSERT INTO favorites (id, type, refJson, createdAt) VALUES (?, ?, ?, ?)").run(
-          id,
-          item.type || "SNIPPET",
-          // DOCUMENT|SNIPPET|ANSWER
-          JSON.stringify(item),
-          Date.now()
-        );
-        return { success: true };
-      } catch (err) {
-        console.error("Failed to add favorite:", err);
-        return { success: false, error: err.message };
-      }
-    });
-    import_electron4.ipcMain.handle("search:sendToAsk", async (event, { query, context }) => {
-      console.log("Sending to Ask:", query, context);
-      return { success: true };
-    });
-    import_electron4.ipcMain.handle("search:getPreview", async (event, { fileId, chunkId }) => {
-      try {
-        const file = filesRepo.getById(fileId);
-        if (!file)
-          throw new Error("File not found");
-        const { getDb: getDb2 } = (init_db(), __toCommonJS(db_exports));
-        const db2 = getDb2();
-        let chunk;
-        if (chunkId && chunkId.includes("_")) {
-          const parts = chunkId.split("_");
-          if (parts.length >= 2) {
-            const index = parseInt(parts[parts.length - 1]);
-            if (!isNaN(index)) {
-              chunk = db2.prepare("SELECT * FROM chunks WHERE fileId = ? AND chunkIndex = ?").get(fileId, index);
-            }
-          }
-        }
-        if (!chunk && chunkId) {
-          chunk = db2.prepare("SELECT * FROM chunks WHERE id = ?").get(chunkId);
-        }
-        const content = chunk ? chunk.text : (await require("fs").promises.readFile(file.path, "utf-8")).substring(0, 2e3);
-        return {
-          success: true,
-          data: {
-            content,
-            file,
-            chunk
-          }
-        };
-      } catch (err) {
-        console.error("Preview error:", err);
-        return { success: false, error: err.message };
-      }
-    });
-  }
-});
-
 // electron/src/services/storage/repositories/favorites.repo.ts
+var favorites_repo_exports = {};
+__export(favorites_repo_exports, {
+  addFavorite: () => addFavorite,
+  createFolder: () => createFolder,
+  deleteFolder: () => deleteFolder,
+  getAllTags: () => getAllTags,
+  getFavorite: () => getFavorite,
+  getTagCounts: () => getTagCounts,
+  incrementUsedCount: () => incrementUsedCount,
+  listFavorites: () => listFavorites,
+  listFolders: () => listFolders,
+  removeFavorite: () => removeFavorite,
+  updateFavorite: () => updateFavorite
+});
 function mapRowToFavorite(row) {
   return {
     id: row.id,
@@ -1356,6 +1354,98 @@ var init_favorites_repo = __esm({
     "use strict";
     init_db();
     import_uuid4 = require("uuid");
+  }
+});
+
+// electron/src/ipc/handlers/search.handlers.ts
+var search_handlers_exports = {};
+var import_electron4;
+var init_search_handlers = __esm({
+  "electron/src/ipc/handlers/search.handlers.ts"() {
+    "use strict";
+    import_electron4 = require("electron");
+    init_searchService();
+    init_files_repo();
+    import_electron4.ipcMain.handle("search:query", async (event, { query, options }) => {
+      try {
+        console.log("[search:query] Request:", query, options);
+        const { results, stats } = await searchService.search(query, options);
+        return { success: true, results, stats };
+      } catch (err) {
+        console.error("[search:query] Error:", err);
+        return { success: false, error: err.message || "Search failed" };
+      }
+    });
+    import_electron4.ipcMain.handle("search:openFile", async (event, filePath) => {
+      console.log("Opening file:", filePath);
+      try {
+        await import_electron4.shell.openPath(filePath);
+        return { success: true, message: `Opened ${filePath}` };
+      } catch (err) {
+        console.error("Failed to open file:", err);
+        return { success: false, error: err.message };
+      }
+    });
+    import_electron4.ipcMain.handle("search:addFavorite", async (event, item) => {
+      console.log("Adding to favorites:", item);
+      const { addFavorite: addFavorite2 } = (init_favorites_repo(), __toCommonJS(favorites_repo_exports));
+      try {
+        const kind = item.chunkId ? "SNIPPET" : "DOCUMENT";
+        addFavorite2({
+          kind,
+          title: item.title,
+          ref: {
+            fileId: item.fileId,
+            chunkId: item.chunkId,
+            path: item.path,
+            snippet: item.snippet
+          },
+          tags: item.tags || []
+        });
+        return { success: true };
+      } catch (err) {
+        console.error("Failed to add favorite:", err);
+        return { success: false, error: err.message };
+      }
+    });
+    import_electron4.ipcMain.handle("search:sendToAsk", async (event, { query, context }) => {
+      console.log("Sending to Ask:", query, context);
+      return { success: true };
+    });
+    import_electron4.ipcMain.handle("search:getPreview", async (event, { fileId, chunkId }) => {
+      try {
+        const file = filesRepo.getById(fileId);
+        if (!file)
+          throw new Error("File not found");
+        const { getDb: getDb2 } = (init_db(), __toCommonJS(db_exports));
+        const db2 = getDb2();
+        let chunk;
+        if (chunkId && chunkId.includes("_")) {
+          const parts = chunkId.split("_");
+          if (parts.length >= 2) {
+            const index = parseInt(parts[parts.length - 1]);
+            if (!isNaN(index)) {
+              chunk = db2.prepare("SELECT * FROM chunks WHERE fileId = ? AND chunkIndex = ?").get(fileId, index);
+            }
+          }
+        }
+        if (!chunk && chunkId) {
+          chunk = db2.prepare("SELECT * FROM chunks WHERE id = ?").get(chunkId);
+        }
+        const content = chunk ? chunk.text : (await require("fs").promises.readFile(file.path, "utf-8")).substring(0, 2e3);
+        return {
+          success: true,
+          data: {
+            content,
+            file,
+            chunk
+          }
+        };
+      } catch (err) {
+        console.error("Preview error:", err);
+        return { success: false, error: err.message };
+      }
+    });
   }
 });
 
@@ -1686,6 +1776,21 @@ function formatSize(bytes) {
     return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+function validatePath(filePath) {
+  if (!filePath)
+    return false;
+  try {
+    const normalizedPath = path4.normalize(filePath).toLowerCase();
+    const sources = sourcesRepo.getAll();
+    return sources.some((source) => {
+      const normalizedSourcePath = path4.normalize(source.path).toLowerCase();
+      return normalizedPath.startsWith(normalizedSourcePath);
+    });
+  } catch (err) {
+    console.error("Path validation error:", err);
+    return false;
+  }
+}
 function transformFile(record) {
   let sourceName = "Unknown";
   if (record.sourceId) {
@@ -1737,6 +1842,8 @@ var init_documents_handlers = __esm({
     fs5 = __toESM(require("fs"));
     init_files_repo();
     init_sources_repo();
+    init_jobs_repo();
+    init_fileLogger();
     import_electron7.ipcMain.handle("documents:list", async (_, filters, sort) => {
       try {
         let files = filesRepo.list({
@@ -1820,6 +1927,10 @@ var init_documents_handlers = __esm({
         const file = filesRepo.getById(documentId);
         if (!file)
           return null;
+        if (!validatePath(file.path)) {
+          console.warn(`[Security] Unauthorized access attempt to document: ${file.path}`);
+          throw new Error("Unauthorized: Path is outside of allowed sources");
+        }
         const doc = transformFile(file);
         try {
           if (fs5.existsSync(file.path)) {
@@ -1846,10 +1957,19 @@ var init_documents_handlers = __esm({
     });
     import_electron7.ipcMain.handle("documents:reindex", async (_, documentId) => {
       try {
+        const file = filesRepo.getById(documentId);
+        if (!file)
+          throw new Error("File not found");
         filesRepo.updateStatus(documentId, "pending");
-        setTimeout(() => {
-          filesRepo.updateStatus(documentId, "indexed");
-        }, 1e3);
+        jobsRepo.create({
+          type: "INDEX_FILE",
+          payloadJson: JSON.stringify({
+            fileId: file.id,
+            filePath: file.path,
+            sourceId: file.sourceId
+          })
+        });
+        logToFile(`[IPC] Reindex requested for file: ${file.path}`);
         return true;
       } catch (error) {
         console.error("Failed to reindex document:", error);
@@ -1869,6 +1989,10 @@ var init_documents_handlers = __esm({
       try {
         let targetPath = path4.normalize(filePath);
         console.log("Revealing file in explorer:", targetPath);
+        if (!validatePath(targetPath)) {
+          console.warn(`[Security] Unauthorized reveal attempt: ${targetPath}`);
+          return false;
+        }
         if (!fs5.existsSync(targetPath)) {
           console.warn("File does not exist:", targetPath);
           const dirPath = path4.dirname(targetPath);
@@ -1889,6 +2013,10 @@ var init_documents_handlers = __esm({
     import_electron7.ipcMain.handle("documents:open", async (_, filePath) => {
       try {
         console.log("Opening file:", filePath);
+        if (!validatePath(filePath)) {
+          console.warn(`[Security] Unauthorized open attempt: ${filePath}`);
+          return false;
+        }
         const result = await import_electron7.shell.openPath(filePath);
         if (result) {
           throw new Error(`Failed to open file: ${result}`);
@@ -1898,6 +2026,15 @@ var init_documents_handlers = __esm({
         console.error("Failed to open document:", error);
         throw error;
       }
+    });
+    import_electron7.ipcMain.handle("file:open", async (_, filePath) => {
+      return await import_electron7.shell.openPath(filePath) === "" ? true : false;
+    });
+    import_electron7.ipcMain.handle("file:showInFolder", async (_, filePath) => {
+      if (!validatePath(filePath))
+        return false;
+      import_electron7.shell.showItemInFolder(filePath);
+      return true;
     });
     import_electron7.ipcMain.handle("documents:bulkRemove", async (_, documentIds) => {
       try {
@@ -1912,8 +2049,23 @@ var init_documents_handlers = __esm({
     });
     import_electron7.ipcMain.handle("documents:bulkReindex", async (_, documentIds) => {
       try {
+        const jobs = [];
         for (const id of documentIds) {
-          filesRepo.updateStatus(id, "pending");
+          const file = filesRepo.getById(id);
+          if (file) {
+            filesRepo.updateStatus(id, "pending");
+            jobs.push({
+              type: "INDEX_FILE",
+              payloadJson: JSON.stringify({
+                fileId: file.id,
+                filePath: file.path,
+                sourceId: file.sourceId
+              })
+            });
+          }
+        }
+        if (jobs.length > 0) {
+          jobsRepo.createBatch(jobs);
         }
         return true;
       } catch (error) {
@@ -2111,14 +2263,40 @@ var init_sources_handlers = __esm({
 
 // electron/src/services/indexing/textExtractor.ts
 async function extractText(filePath) {
+  if (!fs6.existsSync(filePath))
+    return "";
   const ext = path6.extname(filePath).toLowerCase();
   try {
-    if (ext === ".txt" || ext === ".md" || ext === ".json" || ext === ".ts" || ext === ".js" || ext === ".py") {
-      return fs6.promises.readFile(filePath, "utf-8");
+    const commonTextExts = [".txt", ".md", ".json", ".ts", ".js", ".py", ".java", ".cpp", ".c", ".h", ".vue", ".css", ".html"];
+    if (commonTextExts.includes(ext)) {
+      try {
+        return await fs6.promises.readFile(filePath, "utf-8");
+      } catch (utf8Err) {
+        console.warn(`[TextExtractor] UTF-8 read failed for ${filePath}, trying latin1 fallback...`);
+        return await fs6.promises.readFile(filePath, "binary");
+      }
+    }
+    if (ext === ".pdf") {
+      try {
+        const pdf = require("pdf-parse");
+        const dataBuffer = fs6.readFileSync(filePath);
+        const options = {
+          // Could add custom pagerender if needed
+        };
+        const data = await pdf(dataBuffer, options);
+        if (!data || !data.text) {
+          console.warn(`[TextExtractor] PDF yielded no text: ${filePath}`);
+          return "";
+        }
+        return data.text;
+      } catch (pdfErr) {
+        console.error(`[TextExtractor] PDF extraction CRITICAL error for ${filePath}:`, pdfErr.message);
+        return "";
+      }
     }
     return "";
   } catch (error) {
-    console.error(`Error extracting text from ${filePath}:`, error);
+    console.error(`[TextExtractor] Unexpected error from ${filePath}:`, error);
     return "";
   }
 }
@@ -2175,6 +2353,9 @@ var init_indexOrchestrator = __esm({
       async indexFile(fileId, filePath, sourceId) {
         console.log(`[IndexOrchestrator] Indexing file: ${filePath}`);
         try {
+          await pythonClient.deleteFile(fileId).catch((err) => {
+            console.warn(`[IndexOrchestrator] Non-critical: Pre-index cleanup failed for ${fileId}:`, err.message);
+          });
           if (!fs7.existsSync(filePath)) {
             throw new Error(`File not found: ${filePath}`);
           }
@@ -2243,8 +2424,11 @@ var init_indexOrchestrator = __esm({
       async deleteFile(fileId) {
         console.log(`[IndexOrchestrator] Deleting file: ${fileId}`);
         try {
+          await pythonClient.deleteFile(fileId).catch((err) => {
+            console.error("[IndexOrchestrator] Failed to delete from Qdrant during sync:", err);
+          });
           filesRepo.delete(fileId);
-          console.log(`[IndexOrchestrator] Deleted file record ${fileId}`);
+          console.log(`[IndexOrchestrator] Deleted file record ${fileId} and synced with AI`);
         } catch (err) {
           console.error(`[IndexOrchestrator] Error deleting file ${fileId}:`, err);
           throw err;
@@ -2635,14 +2819,16 @@ import_electron9.app.whenReady().then(async () => {
   }
   let source = sourcesRepo.getByPath(docsPath);
   if (!source) {
-    console.log("Creating default source:", docsPath);
+    console.log("[Main] Creating default source:", docsPath);
     source = sourcesRepo.create({
       name: "My Docs",
       path: docsPath,
       type: "folder"
     });
   }
-  fileScanner.scanSource(source.id, docsPath).catch((err) => console.error("Startup scan failed:", err));
+  fileScanner.scanSource(source.id, docsPath).catch((err) => {
+    console.error("[Main] Startup scan failed:", err);
+  });
   createWindow();
   import_electron9.app.on("activate", () => {
     if (import_electron9.BrowserWindow.getAllWindows().length === 0) {
